@@ -37,6 +37,22 @@ The related code and paper, please check  the link
 
 1  N-Lora  LoRA Part code using the peft 0.3.0:[peft · PyPI](https://pypi.org/project/peft/0.3.0/#files) .
 
- 1.1 It change the code  src/peft/tuners/lora.py , [Continual-Flat-LoRA/src/peft/tuners/lora.py at main · zuti666/Continual-Flat-LoRA](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/tuners/lora.py), please check the code with note  # modified.
+ 1.1 It change the code  src/peft/tuners/lora.py , [[N-LoRA/src/peft/tuners/lora.py at main · PKU-YuanGroup/N-LoRA](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/src/peft/tuners/lora.py)](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/tuners/lora.py), please check the code with note  # modified.
 
-1.2 It change the code  src/peft/utils/save_and_load.py , [Continual-Flat-LoRA/src/peft/utils/save_and_load.py at main · zuti666/Continual-Flat-LoRA](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/utils/save_and_load.py) , please check the code with note  # modified..
+1.2 It change the code  src/peft/utils/save_and_load.py , [[N-LoRA/src/peft/utils/save_and_load.py at main · PKU-YuanGroup/N-LoRA](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/src/peft/utils/save_and_load.py)](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/utils/save_and_load.py) , please check the code with note  # modified.
+
+
+
+2  I saved these changed and rename these file with _Nola, and I also try to  compare the two different vison , the compare result are saved with _compare. 
+
+I add the origin LoRA code. They are src/peft/tuners/lora_originLoRA030.py and src/peft/utils/save_and_load_originLoRA030.py
+
+Pelese Note , If you want to 
+
+- Run the origin lora code,  please copy src/peft/tuners/lora_originLoRA030.py into src/peft/tuners/lora.py , copy src/peft/utils/save_and_load_originLoRA030.py into src/peft/utils/save_and_load.py
+- Run the Nlora code,  please copy src/peft/tuners/lora_modifiedNlora.py into src/peft/tuners/lora.py , copy src/peft/utils/save_and_load_modifiedNlora.py into src/peft/utils/save_and_load.py
+- Check the difference between origin LoRA 0.3.0 version and  modified NLoRA , please
+
+read the code src/peft/tuners/lora_compare-analyse.py.
+
+3 
