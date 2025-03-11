@@ -44,7 +44,7 @@ from transformers import (
     set_seed, )
 from transformers.file_utils import is_offline_mode
 from transformers.trainer_utils import get_last_checkpoint
-from peft import get_peft_config, get_peft_model, LoraConfig, TaskType, PeftModel, PeftConfig # add
+from peft import get_peft_config, get_peft_model, LoraConfig, TaskType, PeftModel, PeftConfig  # add
 
 from uie_collator import DataCollatorForUIE
 from uie_dataset_lora import gen_cache_path
@@ -77,7 +77,8 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+        metadata={
+            "help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
@@ -87,15 +88,18 @@ class ModelArguments:
     )
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Where to store the pretrained models downloaded from huggingface.co"},
+        metadata={
+            "help": "Where to store the pretrained models downloaded from huggingface.co"},
     )
     use_fast_tokenizer: bool = field(
         default=True,
-        metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
+        metadata={
+            "help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
     )
     model_revision: str = field(
         default="main",
-        metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
+        metadata={
+            "help": "The specific model version to use (can be a branch name, tag name or commit id)."},
     )
     use_auth_token: bool = field(
         default=False,
@@ -125,7 +129,8 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-    lang: str = field(default=None, metadata={"help": "Language id for multilingual model."})
+    lang: str = field(default=None, metadata={
+                      "help": "Language id for multilingual model."})
     data_dir: str = field(
         default=None, metadata={"help": "The directory for saving the UIE train/dev/test splits."}
     )
@@ -183,8 +188,10 @@ class DataTrainingArguments:
     )
     max_num_instances_per_eval_task: int = field(
         default=200,
-        metadata={"help": "The maximum number of instances we will consider for each validation/test task."}
+        metadata={
+            "help": "The maximum number of instances we will consider for each validation/test task."}
     )
+
     max_train_samples: Optional[int] = field(
         default=None,
         metadata={
@@ -206,6 +213,15 @@ class DataTrainingArguments:
                     "value if set."
         },
     )
+    # 添加参数，用来设置 flatminal 的最大数量
+    max_flatminal_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of prediction examples to this "
+                    "value if set."
+        },
+    )
+
     num_examples: Optional[int] = field(
         default=0,
         metadata={"help": "number of in-context positive examples."}
@@ -222,7 +238,8 @@ class DataTrainingArguments:
     )
     add_dataset_name: Optional[bool] = field(
         default=False,
-        metadata={"help": "whether to preappend dataset name before the task input."}
+        metadata={
+            "help": "whether to preappend dataset name before the task input."}
     )
 
 
@@ -234,11 +251,33 @@ class UIETrainingArguments(Seq2SeqTrainingArguments):
     )
     denser_evaluation: Optional[bool] = field(
         default=False,
-        metadata={"help": "If specifid, the model will do more evaluation at the beginning of training."}
+        metadata={
+            "help": "If specifid, the model will do more evaluation at the beginning of training."}
     )
-    do_demo: bool = field(default=False, metadata={"help": "Whether to run the model as a demo in the terminal."})
-    lamda_1: float = field(default = 0.5)
-    lamda_2: float = field(default = 0)
+    do_demo: bool = field(default=False, metadata={
+                          "help": "Whether to run the model as a demo in the terminal."})
+    lamda_1: float = field(default=0.5)
+    lamda_2: float = field(default=0)
+
+    # 尝试添加自定义参数 ，do_flatminal 用来指示是否执行flatminal的评估
+    do_flatminal: bool = field(default=False, metadata={
+                               "help": "Whether to do flatminal."})
+
+    # 尝试添加自定义参数 ，flag_originLoRA 用来指示 当前方法是否为Lora 方法
+    flag_originLoRA: bool = field(default=False, metadata={
+                                  "help": "Whether to do flatminal."})
+
+    # 尝试添加自定义参数 ，flag_modifiedNLoRA 用来指示 当前方法为NLora方法
+    flag_modifiedNLoRA: bool = field(default=False, metadata={
+                                     "help": "Whether to do flatminal."})
+
+    # 尝试添加自定义参数 ，flag_modified_fullLoRA 用来指示 当前方法为NLora方法,是否对所有的lora部分进行评估
+    flag_modifiedNLoRA_fullLoRA: bool = field(
+        default=False, metadata={"help": "Whether to do flatminal."})
+
+    # 尝试添加自定义参数 ，flag_modified_taskLoRA 用来指示 当前方法为NLora方法,是否只对与任务有关的LoRA进行评估
+    flag_modifiedNLoRA_taskLoRA: bool = field(
+        default=False, metadata={"help": "Whether to do flatminal."})
 
 
 def main():
@@ -246,11 +285,13 @@ def main():
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
 
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, UIETrainingArguments))
+    parser = HfArgumentParser(
+        (ModelArguments, DataTrainingArguments, UIETrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        model_args, data_args, training_args = parser.parse_json_file(
+            json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -312,10 +353,11 @@ def main():
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
-    if 'adapter' in model_args.model_name_or_path: # load lora-config
+    if 'adapter' in model_args.model_name_or_path:  # load lora-config
         config = PeftConfig.from_pretrained(model_args.model_name_or_path)
         if 'llama' in model_args.model_name_or_path.lower():
-            tokenizer = transformers.LlamaTokenizer.from_pretrained(config.base_model_name_or_path)
+            tokenizer = transformers.LlamaTokenizer.from_pretrained(
+                config.base_model_name_or_path)
             config.bos_token_id = 1
             config.eos_token_id = 2
             config.pad_token_id = 1
@@ -323,7 +365,8 @@ def main():
             tokenizer.eos_token_id = 2
             tokenizer.pad_token_id = 1
         else:
-            tokenizer = AutoTokenizer.from_pretrained(config.base_model_name_or_path)
+            tokenizer = AutoTokenizer.from_pretrained(
+                config.base_model_name_or_path)
     elif 'llama' in model_args.model_name_or_path.lower():
         config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
@@ -336,15 +379,15 @@ def main():
         config.pad_token_id = 1
         tokenizer = transformers.LlamaTokenizer.from_pretrained(
             model_args.model_name_or_path,
-            cache_dir = model_args.cache_dir,
-            use_fast = model_args.use_fast_tokenizer,
-            revision = model_args.model_revision,
-            use_auth_token = True if model_args.use_auth_token else None,
+            cache_dir=model_args.cache_dir,
+            use_fast=model_args.use_fast_tokenizer,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
         )
         tokenizer.bos_token_id = 1
         tokenizer.eos_token_id = 2
         tokenizer.pad_token_id = 1
-    else: # load original config
+    else:  # load original config
         config = AutoConfig.from_pretrained(
             model_args.config_name if model_args.config_name else model_args.model_name_or_path,
             cache_dir=model_args.cache_dir,
@@ -362,10 +405,10 @@ def main():
     if 'llama' in model_args.model_name_or_path.lower():  # add llama
         model_class = LlamaForCausalLM_with_lossmask
         tokenizer.padding_side = 'left'
-    else: 
+    else:
         model_class = AutoModelForSeq2SeqLM
 
-    if 'adapter' in model_args.model_name_or_path: # add lora-adapter to the original model
+    if 'adapter' in model_args.model_name_or_path:  # add lora-adapter to the original model
         model = model_class.from_pretrained(config.base_model_name_or_path)
         model = PeftModel.from_pretrained(model, model_args.model_name_or_path)
     elif 'llama' in model_args.model_name_or_path.lower():
@@ -401,7 +444,7 @@ def main():
         model.generation_config.bos_token_id = 1
         model.generation_config.eos_token_id = 2
         model.generation_config.pad_token_id = 1
-        
+
     # fix lora_A/B (bases of previous LoRA parameters, loaded in "load_adapter"[peft_momdel.py])
     # fine-tune loranew_A/B (initialized in "update_layer"[lora.py])
     # optional: lora_A/B is trainable but should not move too far from lorapre_A/B
@@ -439,24 +482,37 @@ def main():
             raise ValueError("--do_train requires a train dataset")
         train_dataset = raw_datasets["train"]
         if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(range(data_args.max_train_samples))
+            train_dataset = train_dataset.select(
+                range(data_args.max_train_samples))
 
     if training_args.do_eval:
         if "validation" not in raw_datasets:
             raise ValueError("--do_eval requires a validation dataset")
         eval_dataset = raw_datasets["validation"]
         if data_args.max_eval_samples is not None:
-            eval_dataset = eval_dataset.select(range(data_args.max_eval_samples))
+            eval_dataset = eval_dataset.select(
+                range(data_args.max_eval_samples))
 
     if training_args.do_predict:
         if "test" not in raw_datasets:
             raise ValueError("--do_predict requires a test dataset")
         predict_dataset = raw_datasets["test"]
         if data_args.max_predict_samples is not None:
-            predict_dataset = predict_dataset.select(range(data_args.max_predict_samples))
+            predict_dataset = predict_dataset.select(
+                range(data_args.max_predict_samples))
+
+    # 修改代码 ，设置用来评估模型的参数
+    if training_args.do_flatminal:
+        if "test" not in raw_datasets:
+            raise ValueError("--do_flatminal requires a test dataset")
+        flatminal_dataset = raw_datasets["test"]
+        if data_args.max_flatminal_samples is not None:
+            flatminal_dataset = flatminal_dataset.select(
+                range(data_args.max_flatminal_samples))
 
     # Data collator
-    label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
+    label_pad_token_id = - \
+        100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     data_collator = DataCollatorForUIE(
         tokenizer,
         model=model,
@@ -478,7 +534,8 @@ def main():
     def compute_rouge_metrics(dataset, preds, save_prefix=None):
         decoded_preds = skip_instructions(model, preds, tokenizer)
         references = [e["Instance"]["label"] for e in dataset]
-        result = compute_metrics(predictions=decoded_preds, references=references)
+        result = compute_metrics(
+            predictions=decoded_preds, references=references)
         result_per_task = compute_grouped_metrics(predictions=decoded_preds, references=references,
                                                   groups=dataset["Task"])
         result.update(result_per_task)
@@ -486,7 +543,8 @@ def main():
         result_per_category = compute_grouped_metrics(predictions=decoded_preds, references=references,
                                                       groups=categories)
         result.update(result_per_category)
-        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
+        prediction_lens = [np.count_nonzero(
+            pred != tokenizer.pad_token_id) for pred in preds]
         result["gen_len"] = np.mean(prediction_lens)
         result = {k: round(v, 4) for k, v in result.items()}
         if save_prefix is not None:
@@ -500,7 +558,8 @@ def main():
                     }) + "\n")
         return result
 
-    print(f"-----Gradient checkpointing: {training_args.gradient_checkpointing} -----")
+    print(
+        f"-----Gradient checkpointing: {training_args.gradient_checkpointing} -----")
     if training_args.gradient_checkpointing:
         model.gradient_checkpointing_enable()
 
@@ -512,7 +571,8 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_rouge_metrics,
-        callbacks=[DenserEvalCallback] if training_args.denser_evaluation else None
+        callbacks=[
+            DenserEvalCallback] if training_args.denser_evaluation else None
     )
 
     all_metrics = {"run_name": training_args.run_name}
@@ -527,12 +587,13 @@ def main():
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
         peft_model_id = training_args.output_dir + "/adapter"
-        trainer.model.save_pretrained(peft_model_id)  
+        trainer.model.save_pretrained(peft_model_id)
         tokenizer.save_pretrained(peft_model_id)
 
         metrics = train_result.metrics
         max_train_samples = (
-            data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+            data_args.max_train_samples if data_args.max_train_samples is not None else len(
+                train_dataset)
         )
         metrics["train_samples"] = min(max_train_samples, len(train_dataset))
 
@@ -559,7 +620,8 @@ def main():
         logger.info("*** Loading CheckPoint ***")
 
         if data_args.max_predict_samples is not None:
-            predict_dataset = predict_dataset.select(range(data_args.max_predict_samples))
+            predict_dataset = predict_dataset.select(
+                range(data_args.max_predict_samples))
 
         predict_results = trainer.predict(
             predict_dataset,
@@ -571,14 +633,35 @@ def main():
         )
         metrics = predict_results.metrics
         max_predict_samples = (
-            data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
+            data_args.max_predict_samples if data_args.max_predict_samples is not None else len(
+                predict_dataset)
         )
-        metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
+        metrics["predict_samples"] = min(
+            max_predict_samples, len(predict_dataset))
 
         trainer.log(metrics)
         trainer.log_metrics("predict", metrics)
         trainer.save_metrics("predict", metrics)
         all_metrics.update(metrics)
+
+    if training_args.do_flatminal:
+        logger.info(f'***5***--5-1 begin analyse_flat_minima  ')
+
+        if data_args.max_flatminal_samples is not None:
+            flatminal_dataset = flatminal_dataset.select(
+                range(data_args.max_flatminal_samples))
+
+        # **1. 直接使用 trainer.model（已包含 LoRA 适配器）**
+        # **3. 计算损失景观**
+        logger.info(
+            f'***5***--5-2 compute_loss_landscape flag_Nlore={Flag_Nlora},output_dir={analyse_model_path}  ')
+        trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=Flag_Nlora_full_eval，eval_dataset=predict_dataset, output_dir=analyse_model_path, name="lossShape")
+
+        # **4. 计算 Hessian 矩阵**
+        logger.info(f'***5***--5-3 compute_loss_hessian  ')
+        trainer.compute_hessian_version1(flag_lora=training_args.flag_originLoRA, eval_dataset=predict_dataset,
+                                         output_dir=analyse_model_path, name="hessian", flag_Nlora_full=Flag_Nlora_full_eval)
+        logger.info(f'***5***--5-4 compute mina flat finish`  ')
 
     return results
 

@@ -270,14 +270,7 @@ For clarify how the code work, I add some log information to check the middle in
 最后调用 即可。
 
 ```python
-logger.info(f'***5***--5-2 compute_loss_landscape flag_Nlore={Flag_Nlora},output_dir={analyse_model_path}  ')
-        trainer.compute_loss_landscape(flag_Nlora=Flag_Nlora,eval_dataset=predict_dataset,output_dir=analyse_model_path, name="lossShape",flag_Nlora_full=Flag_Nlora_full_eval)
 
-        # **4. 计算 Hessian 矩阵**
-        logger.info(f'***5***--5-3 compute_loss_hessian  ')
-        trainer.compute_hessian_version1(flag_Nlora=Flag_Nlora, eval_dataset=predict_dataset,
-                                         output_dir=analyse_model_path, name="hessian",flag_Nlora_full=Flag_Nlora_full_eval)
-        logger.info(f'***5***--5-4 compute mina flat finish`  ')
 ```
 
 但是为了区分到底当前运行的是lora 代码还是 Nlora的代码，我们在 
@@ -293,13 +286,39 @@ class UIETrainingArguments(Seq2SeqTrainingArguments):
     # 尝试添加自定义参数 ，flag_originLoRA 用来指示 当前方法是否为Lora 方法
     flag_originLoRA: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
     
-    # 尝试添加自定义参数 ，flag_modifiedNLoRA 用来指示 当前方法是否为Lora 方法
+    # 尝试添加自定义参数 ，flag_modifiedNLoRA 用来指示 当前方法为NLora方法
     flag_modifiedNLoRA: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
+    
+    # 尝试添加自定义参数 ，flag_modified_fullLoRA 用来指示 当前方法为NLora方法,是否对所有的lora部分进行评估
+    flag_modifiedNLoRA_fullLoRA: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
+    
+    # 尝试添加自定义参数 ，flag_modified_taskLoRA 用来指示 当前方法为NLora方法,是否只对与任务有关的LoRA进行评估
+    flag_modifiedNLoRA_fullLoRA: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
+    
 ```
 
 由于我们添加了新的参数，因此也需要相应地修改数据库中用来 进行 flat_minal 的参数，用来设定进行评估 flat_minal 的数据设定
 
 ```python
+@dataclass
+class DataTrainingArguments:
+	# 添加参数，用来设置 flatminal 的最大数量
+    max_flatminal_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of prediction examples to this "
+                    "value if set."
+        },
+    )
+
+    
+# 修改代码 ，设置用来评估模型的参数
+    if training_args.do_flatminal:
+        if "test" not in raw_datasets:
+            raise ValueError("--do_predict requires a test dataset")
+        flatminal_dataset = raw_datasets["test"]
+        if data_args.max_flatminal_samples is not None:
+            flatminal_dataset = flatminal_dataset.select(range(data_args.max_flatminal_samples))
 
 ```
 
@@ -309,7 +328,9 @@ class UIETrainingArguments(Seq2SeqTrainingArguments):
 
 
 
-注意为了节省空间，可以直接加载保存好的模型，然后再进行评估，而不是再训练完就进行评估，此时调用的 .sh 需要加载 保存好的模型，
+注意为了节省空间，可以直接加载保存好的模型，然后再进行评估，而不是再训练完就进行评估，此时调用的 .sh 需要加载 保存好的模型，这里就需要重新设置保存结果的路径
+
+
 
 
 
