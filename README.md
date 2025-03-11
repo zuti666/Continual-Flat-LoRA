@@ -1,128 +1,24 @@
-<h2 align="center">
-    【COLING 2025】<a href="https://arxiv.org/abs/2410.10179">Is Parameter Collision Hindering Continual Learning in LLMs?</a> <br>
-</h2>
-<h5 align="center"> Code for the N-LoRA method introduced in the COLING 2025 paper 'Is Parameter Collision Hindering Continual Learning in LLMs?', exploring novel approaches to address parameter collision issues in large language models for continual learning. 
-<h5 align="center"> If you like our project, please give us a star ⭐ on GitHub for the latest updates. </h5>
-
-<h5 align="center">
-    
-[![arXiv](https://img.shields.io/badge/Arxiv-Paper-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2410.10179) <br>
-[![License](https://img.shields.io/badge/License-Apache%202.0-yellow)](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/LICENSE) 
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FPKU-YuanGroup%2FN-LoRA&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=Visitor&edge_flat=false)](https://hits.seeyoufarm.com)
-[![GitHub issues](https://img.shields.io/github/issues/PKU-YuanGroup/N-LoRA?color=critical&label=Issues)](https://github.com/PKU-YuanGroup/N-LoRA/issues?q=is%3Aopen+is%3Aissue)
-
-</h5>
-
-<p align="center">
-    <img src="images/fig1.png" alt="Orthogonal and Parameter Collision" width="900">
-</p>
-<p align="center" style="font-size: 14px; font-style: italic;">
-    The Relationship Between Parameter Collision and Orthogonality in Continual Learning
-</p>
-
-<p align="center">
-    <img src="images/fig2.png" alt="Parameter Collision and Nuclear Norms" width="900">
-</p>
-<p align="center" style="font-size: 14px; font-style: italic;">
-    Parameter collision analysis and nuclear norm distributions for O-LoRA and N-LoRA. O-LoRA exhibits higher parameter collisions and nuclear norms, while N-LoRA effectively reduces collisions, ensuring better orthogonality and task-specific accuracy.
-</p>
 
 
 
-## 🛠️Setup
-
-You can install the required libraries by running 
-
-```
-pip install -r requirements.txt
-```
-
-You are also required to download the t5-large model from huggingface, put it to the folder named ```initial_model```, and rename the model folder as 't5-large'.
-
-LLaMA is also supported. You can put your llama model to the folder named ```initial_model``` and rename the model folder as 'llama'.
 
 
 
-## 🚀Training and Evaluation
-
-For t5-large:
-
-You can reproduce our experiments of order 1 & 2 & 3 & 4 & 5 & 6 by simply running
-
-order1:
-
-```
-bash scripts/order_1.sh> logs_and_outputs/order_1/logs/train_and_infer.log 2>&1 &
-```
-
-order2:
-
-```
-bash scripts/order_2.sh> logs_and_outputs/order_2/logs/train_and_infer.log 2>&1 &
-```
-
-order3:
-
-```
-bash scripts/order_3.sh> logs_and_outputs/order_3/logs/train_and_infer.log 2>&1 &
-```
-
-order4:
-
-```
-bash scripts/order_4.sh> logs_and_outputs/order_4/logs/train_and_infer.log 2>&1 &
-```
-
-order5:
-
-```
-bash scripts/order_5.sh> logs_and_outputs/order_5/logs/train_and_infer.log 2>&1 &
-```
-
-order6:
-
-```
-bash scripts/order_6.sh> logs_and_outputs/order_6/logs/train_and_infer.log 2>&1 &
-```
-
-
-The model you have trained will be saved in ```logs_and_outputs/order_1(2 or 3 or 4 or 5 or 6)/outputs```.
-
-The result of each task will be saved in ```logs_and_outputs/order_1(2 or 3 or 4 or 5 or 6)/outputs/TASK_NAME/predict_results.json```.
-
-You can also check the logs during training and infering in  ```logs_and_outputs/order_1(2 or 3 or 4 or 5 or 6)/logs/train_and_infer.log```
-
-For LLaMA:
-
-order1:
-
-```
-bash scripts_llama/order_1.sh> logs_and_outputs_llama/order_1/logs/train_and_infer.log 2>&1 &
-```
-
-order2:
-
-```
-bash scripts_llama/order_2.sh> logs_and_outputs_llama/order_2/logs/train_and_infer.log 2>&1 &
-```
-
-order3:
-
-```
-bash scripts_llama/order_3.sh> logs_and_outputs_llama/order_3/logs/train_and_infer.log 2>&1 &
-```
+# Code Implement Instrcution 
 
 
 
-## 🙏 Acknowledgment
+# Acknowledgment
 
-This repository is adapted from [O-LoRA](https://github.com/cmnfriend/O-LoRA). We sincerely thank the authors of O-LoRA for their contributions and efforts, as their work provided inspiration for this research. We also appreciate their contributions and the assistance provided by the authors.
+# 1 Code follow  N-Lora  paper
+
+The related code and paper, please check  the link 
+
+【COLING 2025】[Is Parameter Collision Hindering Continual Learning in LLMs?](https://arxiv.org/abs/2410.10179) 【COLING 2025】参数冲突会阻碍 LLM 的持续学习吗？ 
+
+[![arXiv](https://camo.githubusercontent.com/6d6b1abf032c5f63c770a6679a3b4cd8435673c43428ce3fc877d32645672469/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f41727869762d50617065722d6233316231622e7376673f6c6f676f3d6172586976)](https://arxiv.org/abs/2410.10179) [![License](https://camo.githubusercontent.com/f062369f074348024e3a42e994b9295e0f3c9feb1f3c25eb910a68f8827e1607/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f4c6963656e73652d417061636865253230322e302d79656c6c6f77)](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/LICENSE) [![Hits](https://camo.githubusercontent.com/29dd6ffb729fecb85323f7532cede80806918cb9c24991038e25d23a89e23431/68747470733a2f2f686974732e736565796f756661726d2e636f6d2f6170692f636f756e742f696e63722f62616467652e7376673f75726c3d68747470732533412532462532466769746875622e636f6d253246504b552d5975616e47726f75702532464e2d4c6f524126636f756e745f62673d253233373943383344267469746c655f62673d2532333535353535352669636f6e3d2669636f6e5f636f6c6f723d253233453745374537267469746c653d56697369746f7226656467655f666c61743d66616c7365)](https://hits.seeyoufarm.com/) [![GitHub issues](https://camo.githubusercontent.com/6642ca99d6afd7cc26aecb2236828d31529703e866168177f99115654ba47f97/68747470733a2f2f696d672e736869656c64732e696f2f6769746875622f6973737565732f504b552d5975616e47726f75702f4e2d4c6f52413f636f6c6f723d637269746963616c266c6162656c3d497373756573)](https://github.com/PKU-YuanGroup/N-LoRA/issues?q=is%3Aopen+is%3Aissue)
 
 
-
-## 📝 Citation
-
-If you find this paper useful, please consider staring 🌟 this repo and citing 📑 our paper:
 
 ```bibtex
 @article{yang2024parameter,
@@ -134,3 +30,13 @@ If you find this paper useful, please consider staring 🌟 this repo and citing
 ```
 
 
+
+
+
+#  Some Analyse abut the N-LoRA Code 
+
+1  N-Lora  LoRA Part code using the peft 0.3.0:[peft · PyPI](https://pypi.org/project/peft/0.3.0/#files) .
+
+ 1.1 It change the code  src/peft/tuners/lora.py , [Continual-Flat-LoRA/src/peft/tuners/lora.py at main · zuti666/Continual-Flat-LoRA](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/tuners/lora.py), please check the code with note  # modified.
+
+1.2 It change the code  src/peft/utils/save_and_load.py , [Continual-Flat-LoRA/src/peft/utils/save_and_load.py at main · zuti666/Continual-Flat-LoRA](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/utils/save_and_load.py) , please check the code with note  # modified..
