@@ -37,13 +37,13 @@ The related code and paper, please check  the link
 
 1  N-Lora  LoRA Part code using the peft 0.3.0:[peft · PyPI](https://pypi.org/project/peft/0.3.0/#files) .
 
- 1.1 It change the code  src/peft/tuners/lora.py , [[N-LoRA/src/peft/tuners/lora.py at main · PKU-YuanGroup/N-LoRA](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/src/peft/tuners/lora.py)](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/tuners/lora.py), please check the code with note  # modified.
+ 1.1 It change the code  src/peft/tuners/lora.py , [[N-LoRA/src/peft/tuners/lora.py at main · PKU-YuanGroup/N-LoRA](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/src/peft/tuners/lora.py)], please check the code with note  # modified.
 
-1.2 It change the code  src/peft/utils/save_and_load.py , [[N-LoRA/src/peft/utils/save_and_load.py at main · PKU-YuanGroup/N-LoRA](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/src/peft/utils/save_and_load.py)](https://github.com/zuti666/Continual-Flat-LoRA/blob/main/src/peft/utils/save_and_load.py) , please check the code with note  # modified.
+1.2 It change the code  src/peft/utils/save_and_load.py , [[N-LoRA/src/peft/utils/save_and_load.py at main · PKU-YuanGroup/N-LoRA](https://github.com/PKU-YuanGroup/N-LoRA/blob/main/src/peft/utils/save_and_load.py)] , please check the code with note  # modified.
 
 
 
-2  I saved these changed and rename these file with _Nola, and I also try to  compare the two different vison , the compare result are saved with _compare. 
+2  I saved these changed and rename these file with _modifiedNlora, and I also try to  compare the two different vison , the compare result are saved with compare-analyse. 
 
 I add the origin LoRA code. They are src/peft/tuners/lora_originLoRA030.py and src/peft/utils/save_and_load_originLoRA030.py
 
@@ -55,4 +55,261 @@ Pelese Note , If you want to
 
 read the code src/peft/tuners/lora_compare-analyse.py.
 
-3 
+
+
+# Understand main loop for run the code
+
+## 1  use  bash to run the code
+
+```
+bash scripts/order_1.sh> logs_and_outputs/order_1/logs/train_and_infer.log 2>&1 &
+```
+
+It tun the scripts/order_1.sh , 
+
+the log file are  logs_and_outputs/order_1/logs/train_and_infer.log
+
+## 2 check the  scripts/order_1.sh
+
+```python
+CUDA_VISIBLE_DEVICES=1 deepspeed --master_port $port src/run_lora.py \
+   --do_train \
+   --do_predict \
+   --predict_with_generate \
+   --model_name_or_path initial_model/t5-large \
+   --data_dir CL_Benchmark \
+   --task_config_dir configs/order1_configs/dbpedia \
+   --instruction_file configs/instruction_config.json \
+   --instruction_strategy single \
+   --output_dir logs_and_outputs_T5large-lora/order_1/outputs/1-dbpedia \
+   --per_device_train_batch_size 16 \
+   --per_device_eval_batch_size 256 \
+   --gradient_accumulation_steps 4 \
+   --learning_rate 1e-03 \
+   --num_train_epochs 10 \
+   --deepspeed configs/ds_configs/stage2.config \
+   --run_name order1_round1 \
+   --max_source_length 512 \
+   --max_target_length 50 \
+   --generation_max_length 50 \
+   --add_task_name True \
+   --add_dataset_name True \
+   --overwrite_output_dir \
+   --overwrite_cache \
+   --lr_scheduler_type constant \
+   --warmup_steps 0 \
+   --logging_strategy steps \
+   --logging_steps 10 \
+   --evaluation_strategy no \
+   --save_strategy no \
+   --save_steps 1500 \
+   --lamda_1 0.4
+```
+
+它来运行 src/run_lora.py 代码，这是程序的主入口， 并且传递了很多参数
+
+注意，和我们之前讲到的，
+
+- 如果想要运行原始lora代码，请复制 src/peft/tuners/lora_modifiedNlora.py 到 src/peft/tuners/lora.py ，并且为了正确保存，请复制 copy src/peft/utils/save_and_load_modifiedNlora.py 到 src/peft/utils/save_and_load.py
+- 如果想要运行Nlora代码，请复制 src/peft/tuners/lora_modifiedNlora.py 到 src/peft/tuners/lora.py , copy src/peft/utils/save_and_load_modifiedNlora.py into src/peft/utils/save_and_load.py
+- 如果想要查看这两个部分代码的区别，请查看 src/peft/tuners/lora_compare-analyse.py.
+
+
+
+代码参数的设置
+
+如果模型过大，请减小 --per_device_train_batch_size ， --per_device_eval_batch_size
+
+请注意训练结束后保存的文件存储在   --output_dir 目录下，具体的文件名在  src/run_Nlora.py 下代码, 这里保存的名字要和.sh下次加载的路径要一致。
+
+```python
+# 修改名称
+        peft_model_id = training_args.output_dir + "/adapter_T5small_Nlora_full"
+        
+```
+
+## 3 check the run_Nlora.py 
+
+主要的代码逻辑在 def main(): 函数中，
+
+- 加载数据
+
+-  加载预训练模型或者加载之前训练保存好的模型
+- 数据按着训练集，测试集划分
+- 设置trainer
+- 训练模型并保存 if training_args.do_train:
+- 评估模型效果 if training_args.do_predict:
+- 我添加的代码 评估模型的 flat minal 
+
+
+
+### 请注意 在第一次训练时，往预训练模型添加 LoRA  的逻辑
+
+是在 
+
+0  src/run_N_lora/ def main: 
+
+```python
+else: 
+    model = get_peft_model(model, peft_config)
+```
+
+1 peft/mapping.py   get_peft_model(model, peft_config):
+
+2 peft/peft_model.py / class PeftModelForSeq2SeqLM(PeftModel): / def \_init\_ 
+
+3 peft/tuner/lora.py / class LoraModel: / def \_init\_ 
+
+   def \_init\_ 调用了 self.add_adapter()  函数 , 
+
+   self.add_adapter()  函数 调用了 self._find_and_replace(adapter_name) 函数
+
+   self._find_and_replace(adapter_name) 函数 调用了  new_module = Linear(adapter_name, in_features, out_features, bias=bias, r_sum=lora_config.r_sum, **kwargs) 
+
+这里生成了新的包含 lora部分的模块
+
+4  peft/tuner/lora.py / class LoraModel: / def \_init\_  其中的  self.update_layer NLoRA进行了改动
+
+这也是为什么调用Lora /Nlora 需要修改 lora.py 文件的原因
+
+
+
+### 保存训练好的 lora 模型的逻辑 
+
+src/peft/peft_model.py  
+
+```python
+class PeftModel(PushToHubMixin, torch.nn.Module):
+
+	def save_pretrained(self, save_directory, **kwargs):
+```
+
+
+
+### 第二次运行加载训练好的Lora模型的代码的逻辑
+
+0  src/run_N_lora  def main:
+
+```python
+if 'adapter' in model_args.model_name_or_path:
+    config = PeftConfig.from_pretrained(model_args.model_name_or_path)
+```
+
+1  src/peft/utils/config.py     def from_pretrained(cls, pretrained_model_name_or_path, 
+
+```python
+@classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, subfolder=None, **kwargs):
+        model.load_adapter(model_id, adapter_name, **kwargs)
+        return model
+```
+
+2   src/peft/peft_model.py  class PeftModel(PushToHubMixin, torch.nn.Module): 
+
+def load_adapter(self, model_id, adapter_name
+
+```python
+def load_adapter(self, model_id, adapter_name
+# load the weights into the model
+        set_peft_model_state_dict(self, adapters_weights, 
+```
+
+3 src/peft/utils/save_and_load.py.py
+
+```python
+def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
+                              
+```
+
+这里作者也进行了改动，所以这也是为什么调用Lora /Nlora 需要修改 save_and_load.py 文件的原因
+
+
+
+# Requirements.txt
+
+If the requireents.txt file fails on your device ,you can try requirements_liying.txt.
+
+
+
+
+
+# Download Initial Model 
+
+To download initial_model, please run  download_Model.py.
+
+
+
+
+
+# Eval the flat minal
+
+To evaluate the model's flat minal, I add two methods on uie_trainer_lora.py.
+
+1 compute_loss_landscape ,: To calcualte the Loss land and save in the .h5 file.
+
+2 compute_hessian_version1: Use block_lanczos to calculate the Hessien eigvalue.
+
+
+
+After train a model, just use 
+
+trainer.compute_loss_landscape , trainer.compute_hessian_version1 to eval the model.
+
+
+
+# Some log Information 
+
+For clarify how the code work, I add some log information to check the middle information.
+
+
+
+#  The modified I made
+
+为了运行 flat minal 的分析代码，可以直接运行训练之后直接进行分析，这样只需要在,
+
+最后调用 即可。
+
+```python
+logger.info(f'***5***--5-2 compute_loss_landscape flag_Nlore={Flag_Nlora},output_dir={analyse_model_path}  ')
+        trainer.compute_loss_landscape(flag_Nlora=Flag_Nlora,eval_dataset=predict_dataset,output_dir=analyse_model_path, name="lossShape",flag_Nlora_full=Flag_Nlora_full_eval)
+
+        # **4. 计算 Hessian 矩阵**
+        logger.info(f'***5***--5-3 compute_loss_hessian  ')
+        trainer.compute_hessian_version1(flag_Nlora=Flag_Nlora, eval_dataset=predict_dataset,
+                                         output_dir=analyse_model_path, name="hessian",flag_Nlora_full=Flag_Nlora_full_eval)
+        logger.info(f'***5***--5-4 compute mina flat finish`  ')
+```
+
+但是为了区分到底当前运行的是lora 代码还是 Nlora的代码，我们在 
+
+src/run_Nlora.py 中添加了  flag 用以区分
+
+```python
+@dataclass
+class UIETrainingArguments(Seq2SeqTrainingArguments):
+	 # 尝试添加自定义参数 ，do_flatminal 用来指示是否执行flatminal的评估
+    do_flatminal: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
+
+    # 尝试添加自定义参数 ，flag_originLoRA 用来指示 当前方法是否为Lora 方法
+    flag_originLoRA: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
+    
+    # 尝试添加自定义参数 ，flag_modifiedNLoRA 用来指示 当前方法是否为Lora 方法
+    flag_modifiedNLoRA: bool = field(default=False, metadata={"help": "Whether to do flatminal."})
+```
+
+由于我们添加了新的参数，因此也需要相应地修改数据库中用来 进行 flat_minal 的参数，用来设定进行评估 flat_minal 的数据设定
+
+```python
+
+```
+
+
+
+
+
+
+
+注意为了节省空间，可以直接加载保存好的模型，然后再进行评估，而不是再训练完就进行评估，此时调用的 .sh 需要加载 保存好的模型，
+
+
+
