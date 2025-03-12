@@ -301,7 +301,9 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    log_level = training_args.get_process_log_level()
+    # 如果不想输出 log 信息将数值改为20即可
+    # log_level = training_args.get_process_log_level()
+    log_level = 10  # 或者 logging.DEBUG（数值 10）
     logger.setLevel(log_level)
     datasets.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.set_verbosity(log_level)
@@ -313,7 +315,7 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
-    logger.info(f"Training/evaluation parameters {training_args}")
+    logger.debug(f"Training/evaluation parameters {training_args}")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -325,7 +327,7 @@ def main():
                 "Use --overwrite_output_dir to overcome."
             )
         elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
-            logger.info(
+            logger.debug(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
@@ -349,7 +351,19 @@ def main():
     raw_datasets.cleanup_cache_files()
 
     # Load pretrained model and tokenizer
-    #
+
+    
+
+    if (not training_args.do_train) and training_args.do_flatminal:
+        # 如果不训练模型，而是直接加载训练后的模型进行分析 flatminal 
+        # 则需要在这里保存输出的路径与训练好的模型一致
+        analyse_model_path = model_args.model_name_or_path
+    elif  training_args.do_train and training_args.do_flatminal:
+        # 如果先训练模型然后直接评估训练后的模型，则输出路径应该与训练好的模型保存路径一致
+        analyse_model_path = training_args.output_dir
+
+
+    
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
@@ -451,7 +465,17 @@ def main():
     # (constrained in "training_step"[uie_trainer_lora.py])
 
     # modified
-    if training_args.do_train and training_args.flag_modifiedNLoRA:
+    
+    if training_args.do_train and training_args.flag_originLoRA:
+        # 如果需要训练模型 并且使用的方法是LoRA 方法
+        # 根据LoRA 方法的设置，这里只有 lora_ 参数，也只更新lora_ 部分的参数
+        for name, param in model.named_parameters():
+            if name.find("lora_") != -1:
+                param.requires_grad = True
+            # this module should always be frozen because we change the vocabulary
+            elif name.find("shared") != -1:
+                param.requires_grad = False
+    elif training_args.do_train and training_args.flag_modifiedNLoRA:
         # 如果需要训练模型 并且使用的方法是N_LoRA 方法
         # 根据N_LoRA 方法的设置，在进行Continual training 时候，只训练更新 task_LoRA，也就是loranew_ 部分
         for name, param in model.named_parameters():
@@ -459,15 +483,6 @@ def main():
                 param.requires_grad = True
             elif name.find("lora_") != -1:
                 param.requires_grad = False
-            # this module should always be frozen because we change the vocabulary
-            elif name.find("shared") != -1:
-                param.requires_grad = False
-    elif training_args.do_train and training_args.flag_originLoRA:
-        # 如果需要训练模型 并且使用的方法是LoRA 方法
-        # 根据LoRA 方法的设置，这里只有 lora_ 参数，也只更新lora_ 部分的参数
-        for name, param in model.named_parameters():
-            if name.find("lora_") != -1:
-                param.requires_grad = True
             # this module should always be frozen because we change the vocabulary
             elif name.find("shared") != -1:
                 param.requires_grad = False
@@ -516,7 +531,7 @@ def main():
                 range(data_args.max_predict_samples))
 
     # 修改代码 ，如果需要评估模型的flat minal 设置使用对应的数据集
-    if training_args.do_flatmina:
+    if training_args.do_flatminal:
         if "test" not in raw_datasets:
             raise ValueError("--do_flatminal requires a test dataset")
         flatminal_dataset = raw_datasets["test"]
@@ -614,7 +629,7 @@ def main():
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
-        logger.info(f"Metrics {metrics}")
+        logger.debug(f"Metrics {metrics}")
         all_metrics.update(metrics)
 
     # Evaluation
@@ -630,8 +645,8 @@ def main():
     repetition_penalty = data_args.repetition_penalty
 
     if training_args.do_predict:
-        logger.info("*** Prediction ***")
-        logger.info("*** Loading CheckPoint ***")
+        logger.debug("*** Prediction ***")
+        logger.debug("*** Loading CheckPoint ***")
 
         if data_args.max_predict_samples is not None:
             predict_dataset = predict_dataset.select(
@@ -657,9 +672,52 @@ def main():
         trainer.log_metrics("predict", metrics)
         trainer.save_metrics("predict", metrics)
         all_metrics.update(metrics)
-
+    
+    
+    # 是否需要评估模型的 flatminal
     if training_args.do_flatminal:
-        logger.info(f'***5***--5-1 begin analyse_flat_minima  ')
+
+
+        #设置需要进行评估的参数
+        if training_args.flag_originLoRA:
+        # 如果需要评估模型 并且模型是LoRA方法训练得到的
+        # 则需要将 模型的LoRA设置为可以更新的，以供计算Hessian矩阵使用
+            for name, param in model.named_parameters():
+                if name.find("lora_") != -1:
+                    param.requires_grad = True
+                # this module should always be frozen because we change the vocabulary
+                elif name.find("shared") != -1:
+                    param.requires_grad = False
+        elif training_args.flag_modifiedNLoRA:
+        # 如果需要评估模型 并且模型是N_LoRA方法训练得到的
+            if training_args.flag_modifiedNLoRA_fullLoRA:
+                # 如果评估N_LoRA方法的所有LoRA （lora_和 loranew_）对模型的影响
+                # 则将这两部分全部设置为可以更新的，以供计算Hessian矩阵使用 
+                for name, param in model.named_parameters():
+                    if name.find("loranew_") != -1:
+                        param.requires_grad = True
+                    elif name.find("lora_") != -1:
+                        param.requires_grad = True
+                    # this module should always be frozen because we change the vocabulary
+                    elif name.find("shared") != -1:
+                        param.requires_grad = False
+            elif training_args.flag_modifiedNLoRA_taskLoRA:
+                # 如果只评估N_LoRA方法的  taskLoRA部分 （loranew_）对模型的影响
+                # 则将这部分设置为可以更新的，以供计算Hessian矩阵使用 
+                for name, param in model.named_parameters():
+                    if name.find("loranew_") != -1:
+                        param.requires_grad = True
+                    elif name.find("lora_") != -1:
+                        param.requires_grad = False
+                    # this module should always be frozen because we change the vocabulary
+                    elif name.find("shared") != -1:
+                        param.requires_grad = False
+
+
+        
+
+
+        logger.debug(f'***5***--5-1 begin analyse_flat_minima  ')
 
         if data_args.max_flatminal_samples is not None:
             flatminal_dataset = flatminal_dataset.select(
@@ -667,17 +725,19 @@ def main():
 
         # **1. 直接使用 trainer.model（已包含 LoRA 适配器）**
         # **3. 计算损失景观**
-        logger.info(
-            f'***5***--5-2 compute_loss_landscape flag_Nlore={Flag_Nlora},output_dir={analyse_model_path}  ')
-        trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=Flag_Nlora_full_eval，eval_dataset=predict_dataset, output_dir=analyse_model_path, name="lossShape")
+        # logger.debug(f'***5***--5-2 compute_loss_landscape flag_lora={training_args.flag_originLoRA}, flag_Nlora={training_args.flag_originLoRA},output_dir={analyse_model_path}  ')
+        # trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path, name="lossShape")
 
         # **4. 计算 Hessian 矩阵**
-        logger.info(f'***5***--5-3 compute_loss_hessian  ')
-        trainer.compute_hessian_version1(flag_lora=training_args.flag_originLoRA, eval_dataset=predict_dataset,
-                                         output_dir=analyse_model_path, name="hessian", flag_Nlora_full=Flag_Nlora_full_eval)
-        logger.info(f'***5***--5-4 compute mina flat finish`  ')
+        logger.debug(f'***5***--5-3 compute_loss_hessian  ')
+        trainer.compute_hessian_version1(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA, flatminal_dataset=flatminal_dataset,output_dir=analyse_model_path, name="hessian")
+        logger.debug(f'***5***--5-4 compute mina flat finish`  ')
 
     return results
+
+
+
+
 
 
 if __name__ == "__main__":

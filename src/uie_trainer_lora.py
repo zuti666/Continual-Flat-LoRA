@@ -7,7 +7,10 @@ from transformers.trainer_callback import TrainerCallback
 from uie_collator import SUPPORTED_DECODER_MODELS, check_model
 from uie_dataset_lora import ANSWER_PREFIX
 
-from datatime import datatime
+from datetime import datetime
+from torch.nn import functional as F
+import copy
+import h5py
 
 def skip_instructions(model, predictions_ids, tokenizer, ignore_idx=-100):
     predictions_ids = np.where(
@@ -163,12 +166,12 @@ class UIETrainer(Seq2SeqTrainer):
 
         batch_size = dataloader.batch_size
 
-        logger.info(f"***** Running {description} *****")
+        logger.debug(f"***** Running {description} *****")
         if has_length(dataloader.dataset):
-            logger.info(f"  Num examples = {self.num_examples(dataloader)}")
+            logger.debug(f"  Num examples = {self.num_examples(dataloader)}")
         else:
-            logger.info("  Num examples: Unknown")
-        logger.info(f"  Batch size = {batch_size}")
+            logger.debug("  Num examples: Unknown")
+        logger.debug(f"  Batch size = {batch_size}")
 
         model.eval()
 
@@ -398,10 +401,24 @@ class UIETrainer(Seq2SeqTrainer):
             labels = None
 
         return (loss, generated_tokens, labels)
+    
+    def _compute_stats(self, eigenvalues):
+        """改进点13：统一统计计算"""
+        if not eigenvalues:
+            return {"min": 0., "max": 0., "median": 0., "mean": 0.}
+        
+        arr = np.array(eigenvalues)
+        return {
+            "min": float(np.min(arr)),
+            "max": float(np.max(arr)),
+            "median": float(np.median(arr)),
+            "mean": float(np.mean(arr)),
+            "std": float(np.std(arr))
+        }
 
     def compute_loss_landscape(
-        self,   eval_dataset: Dataset, output_dir, name="lossLandscape", x_range=(-1, 1), y_range=(-1, 1), num_points=20, max_batches=5,
-        sample_batches=False, flag_lora=True, flag_Nlora_task=False,
+        self,   flatminal_dataset: Dataset, output_dir, name="lossLandscape", x_range=(-1, 1), y_range=(-1, 1), num_points=20, max_batches=5,
+        sample_batches=False, flag_lora=True, flag_Nlora_full=True
     ):
         """
         计算损失景观，并分别计算:
@@ -415,39 +432,41 @@ class UIETrainer(Seq2SeqTrainer):
         # 最终损失网络的数值
         loss_grid = np.zeros((num_points, num_points))
 
-        # 根据模型判断，这里不妨使用手动
+        # 根据需要评估的模型判断，设置Flag，供后面 干扰模型的参数
         if flag_lora:
             # 如果是 lora 方法，干扰 lora 部分
             Flag_Nlora_task = False
             Flag_Nlora_full = False
             Flag_lora = True
+
+            # 保存路径
             surf_file_lora = os.path.join(
                 output_dir, f"{name}_lora_only-evalDataset-orial.h5")
             surf_file = surf_file_lora
-        elif flag_Nlora_task:
-            Flag_Nlora_task = True
-            Flag_Nlora_full = False
-            Flag_lora = False
-            surf_file_Nlora_tasklora = os.path.join(
-                output_dir, f"{name}_Nlora_onlytask-predictDataset-2.h5")
-            surf_file = surf_file_Nlora_tasklora
-        else:
-            Flag_Nlora_task = True
+
+        elif flag_Nlora_full:
+            Flag_Nlora_task = False
             Flag_Nlora_full = True
             Flag_lora = False
+
             surf_file_Nlora_full = os.path.join(
                 output_dir, f"{name}_Nlora_full-predictDataset.h5")
             surf_file = surf_file_Nlora_full
+        else:
+            Flag_Nlora_task = True
+            Flag_Nlora_full = False
+            Flag_lora = False
 
-        if not os.path.exists(surf_file):
-            with open(surf_file, 'w') as f:
-                pass  # 成功创建空文件
+            surf_file_Nlora_tasklora = os.path.join(
+                output_dir, f"{name}_Nlora_onlytask-predictDataset-2.h5")
+            surf_file = surf_file_Nlora_tasklora
+            
 
         # ✅ 记录日志信息
-        logger.info(f'***5***--5-2 **1 compute_loss_landscape  ')
-        logger.info(
+        logger.debug(f'***5***--5-2 **1 compute_loss_landscape  ')
+        logger.debug(
             f"***** Running Loss Landscape Calculation on expriment Nlora_task:{Flag_Nlora_task} ,Nlora_full:{Flag_Nlora_full}  lora:{Flag_lora}*****")
-        logger.info(
+        logger.debug(
             f"Output Dir = {output_dir}，Output File :{surf_file} Num points = {num_points}x{num_points} max_batches = {max_batches}")
 
         # ✅ 兼容 AMP 和分布式训练
@@ -502,7 +521,7 @@ class UIETrainer(Seq2SeqTrainer):
                     d_x = (d_x / d_x.norm()) * (param.norm() + 1e-8)  # 直接归一化
                     perturb_x[name] = d_x.to(device)
 
-                    # 生成正交扰动
+                    # 生成d_x的正交方向的扰动
                     d_y = torch.randn_like(param)
                     d_y = d_y - torch.sum(d_y * d_x) * \
                         d_x / (d_x.norm()**2)  # 施密特正交化
@@ -526,23 +545,28 @@ class UIETrainer(Seq2SeqTrainer):
             start_idx = rank * chunk
             end_idx = (rank + 1) * chunk if rank != world_size - \
                 1 else num_points
-            # all_batches = all_batches[rank::world_size]  # 数据分片
-            logger.info(
+            logger.debug(
                 f'***5***--5-2**4 distribute--yes world_size:{world_size} rank:{rank},start_idx:{start_idx},end_idx:{end_idx} ')
         else:
-            # logger.info(f'****5***--5-2**2-1 if**5***--5-2**5 distribute--no ')
+            # logger.debug(f'****5***--5-2**2-1 if**5***--5-2**5 distribute--no ')
             world_size = 1
             rank = 0
             start_idx, end_idx = 0, num_points
-            logger.info(
+            logger.debug(
                 f'***5***--5-2**4 distribute--no world_size:{world_size} rank:{rank},start_idx:{start_idx},end_idx:{end_idx} ')
 
         # --------------------- 数据准备阶段 ---------------------
-        logger.info(
+        logger.debug(
             f'***5***--5-2**2 begin load data---{torch.distributed.is_initialized()} ')
-        dataloader = self.get_eval_dataloader(eval_dataset)
-        all_batches = list(dataloader)[:max_batches]
-        logger.info(f'***5***--5-2**2 begin load data---{len(all_batches)} ')
+        dataloader = self.get_eval_dataloader(flatminal_dataset)
+
+        all_batches = []
+        for i, batch in enumerate(dataloader):
+            if i >= max_batches:
+                break
+            all_batches.append(batch)
+
+        logger.debug(f'***5***--5-2**2 begin load data---{len(all_batches)} ')
 
         # 合并所有批次为单个大批次（显存允许时）
         if not sample_batches and len(all_batches) > 0:
@@ -590,15 +614,17 @@ class UIETrainer(Seq2SeqTrainer):
                         )
                     total_loss += loss.item()
 
-                loss_grid[i, j] = total_loss / len(all_batches)
+                loss_grid[i, j] = total_loss / max(1, len(all_batches))  # 避免除零
 
-                # 每5次迭代清理一次缓存（优化点6）
-                if j % 5 == 0:
+                # 每10次迭代清理一次缓存（优化点6）
+                if j % 10 == 0:
                     torch.cuda.empty_cache()
 
         # --------------------- 分布式结果收集 ---------------------
         if torch.distributed.is_initialized():
             # 收集所有进程的loss_grid
+
+            # 计算 loss_grid
             # 将 loss_grid 转换为张量
             loss_grid_tensor = torch.tensor(loss_grid, device=device)
             # 创建一个列表，用于接收所有进程的 loss_grid
@@ -607,8 +633,7 @@ class UIETrainer(Seq2SeqTrainer):
             # 收集所有进程的 loss_grid
             torch.distributed.all_gather(all_loss, loss_grid_tensor)
             # 将收集到的结果拼接成一个完整的 loss_grid
-            # loss_grid_tensor = torch.cat(all_loss, dim=0)
-            loss_grid_tensor = torch.stack(all_loss, dim=0).mean(dim=0)
+            loss_grid_tensor = torch.stack(all_loss, dim=0).mean(dim=0) # 取平均
             loss_grid = loss_grid_tensor.cpu().numpy()  # 转回 NumPy 数组后再保存
         else:
             all_loss = [loss_grid]
@@ -620,6 +645,424 @@ class UIETrainer(Seq2SeqTrainer):
                 f.create_dataset('ycoordinates', data=y_coords)
                 f.create_dataset('train_loss', data=loss_grid)
 
-            logger.info(f"计算完成，结果保存至{surf_file}")
+            logger.debug(f"计算完成，结果保存至{surf_file}")
 
+        return True
+
+
+    def compute_hessian_version1(
+        self,
+        flatminal_dataset,
+        output_dir,
+        name="hessian",
+        max_batches=10,
+        sample_batches=False,
+        use_gpu=True,
+        flag_lora=True, flag_Nlora_full=True):
+        """
+            改进版Hessian矩阵计算函数，主要优化：
+            1. 完全消除参数污染风险
+            2. 支持分布式训练环境
+            3. 增强数值稳定性
+            4. 内存效率优化
+            5. 增加特征向量分析
+
+            参数说明：
+            - max_batches: 最大计算batch数（用于大数据集采样）
+            - sample_batches: 是否随机采样batch（True=随机，False=顺序取前N个）
+            
+        """
+        # --------------------- 初始化阶段 ---------------------
+        # 根据模型判断，这里不妨使用手动
+            
+
+        logger.debug(f'***5***--5-3**1 begin init   ')
+        logger.debug(f'***5***--5-3**1 use distribute ---- {torch.distributed.is_initialized()}')
+        
+        args = self.args
+        device = args.device
+
+
+            
+        # 创建独立模型副本（关键改进点1：隔离原始模型）
+        model = copy.deepcopy(self.model)
+        model = self._wrap_model(model, training=False)
+        
+        # 混合精度处理
+        if not self.is_in_train:
+            if args.fp16_full_eval:
+                model = model.to(dtype=torch.float16, device=device)
+            elif args.bf16_full_eval:
+                model = model.to(dtype=torch.bfloat16, device=device)
+        
+        model = model.to(device=device)
+        model.eval()
+
+        logger.debug(f'***5***--LORA Hessian**1 finish init ')
+
+        # --------------------- 数据准备阶段 ---------------------
+        logger.debug(f'***5***--5-3**2 begin load data   ')
+        dataloader = self.get_eval_dataloader(flatminal_dataset)
+        all_batches = list(dataloader)
+
+
+        if torch.distributed.is_initialized():
+            world_size = torch.distributed.get_world_size()
+            rank = torch.distributed.get_rank()
+            all_batches = all_batches[rank::world_size]  # 数据分片
+            logger.debug(f'***5***--LORA Hessian**2 distribute yes, rank:{rank}, total_batches:{len(all_batches)}')
+
+        else:
+            logger.debug(f'***5***--5-3**4 distribute--no ')
+            world_size = 1
+            rank = 0
+        
+        # 数据采样处理
+        logger.debug(f'***5***--5-3**2-1 if  {len(all_batches)} , {max_batches} ')
+        if len(all_batches) > max_batches:
+            if sample_batches:
+                indices = np.random.choice(len(all_batches), max_batches, replace=False)
+                all_batches = [all_batches[i] for i in indices]
+            else:
+                all_batches = all_batches[:max_batches]
+
+
+        # 分布式通信初始化（改进点9：分布式支持）
+        if torch.distributed.is_initialized():
+            logger.debug(f'***5***--5-3**4 distribute--yes ')
+            world_size = torch.distributed.get_world_size()
+            rank = torch.distributed.get_rank()
+            all_batches = all_batches[rank::world_size]  # 数据分片
+            logger.debug(f'***5***--5-3**4 {len(all_batches)} ')
+        else:
+            logger.debug(f'***5***--5-3**4 distribute--no ')
+            world_size = 1
+            rank = 0
+        
+        logger.debug(f'***5***--5-3**2 finish load data ')
+
+        # --------------------- 核心算法定义 ---------------------
+        class HessianCalculator:
+            """
+            Hessian 计算器：
+            - 计算 Hessian-Vector Product (HVP)
+            - 使用 Lanczos 方法估计 Hessian 的特征值
+            
+            参数：
+            - model: 计算 Hessian 的神经网络模型
+            - device: 计算设备 (CPU/GPU)
+            """
+            def __init__(self, model, device,max_dim=10000):
+                logger.debug(f'***5***--5-3**3 class HessianCalculator init   ')
+                self.model = model
+                self.device = device
+                self.criterion = torch.nn.CrossEntropyLoss()
+                # self.max_dim = max_dim  # 限制 Hessian 计算的最大维度
+
+            @staticmethod
+            def _safe_normalize(v, eps=1e-12):
+                """改进点4：安全归一化防止除零错误"""
+                norm = torch.norm(v) + eps
+                return v / norm
+
+            def compute_hvp(self, batch, param_list=None):
+                """计算Hessian-vector乘积函数 (HVP) """
+                logger.debug(f'***5***--5-3**5 begin compute_hvp() ')
+                self.model.zero_grad() # 清空梯度
+                batch = {k: v.to(self.device) for k, v in batch.items()}
+
+                
+                with torch.autograd.set_grad_enabled(True):
+                    
+                    outputs = self.model(**batch)
+                    loss = self.criterion(
+                        outputs.logits.view(-1, outputs.logits.size(-1)),
+                        batch["labels"].view(-1)
+                    )
+                
+                # 根据传入参数的类型适配：字典或列表/元组
+                # 选择需要计算 Hessian 的参数
+                if isinstance(param_list, dict):
+                    params = [p for p in param_list.values() if p.requires_grad]
+                elif isinstance(param_list, (list, tuple)):
+                    params = [p for p in param_list if p.requires_grad]
+                else:
+                    params = []  # 若传入为 None 或其它类型，则空处理
+
+                # 计算一阶梯度
+                grads = torch.autograd.grad(loss, params, create_graph=True)
+
+                def hvp_func(v):
+                    """计算 Hessian 向量积,闭包函数保持计算图"""
+                    
+                                
+                    split_sizes = [p.numel() for p in params]  # 计算每个 param 对应的大小
+                    v_split = torch.split(v, split_sizes)  # 按照每个参数的形状拆分 v
+                    v_reshaped = [v_i.view(p.shape) for v_i, p in zip(v_split, params)]  # 重新调整 v_i 形状
+
+                    # logger.debug(f"grads shape: {[g.shape for g in grads]}")
+                    # logger.debug(f"v shape: {v.shape}")
+                    # logger.debug(f"Total params count: {len(params)}, Total elements in params: {sum(split_sizes)}")
+                    # logger.debug(f"🔹 First 5 split sizes: {split_sizes[:5]}")
+                    # logger.debug(f"🔹 First 5 param shapes: {[p.shape for p in params[:5]]}")
+                    # logger.debug(f"🔹 First 5 v_split shapes: {[v_i.shape for v_i in v_split[:5]]}")
+                    
+                    # 计算 Hessian 作用
+                    Hv = torch.autograd.grad(
+                        grads, params, grad_outputs=v_reshaped, 
+                        retain_graph=True, allow_unused=True
+                    )
+                    
+                    # 拼接计算结果
+                    Hv_flattened = torch.cat([
+                        hv.contiguous().flatten() if hv is not None else torch.zeros_like(p).flatten()
+                        for hv, p in zip(Hv, params)
+                    ]).to(self.device)
+
+                    # logger.debug(f"🔹 Hv computed successfully, shape: {Hv_flattened.shape}")
+                    torch.cuda.empty_cache()  # 释放显存
+                    return Hv_flattened
+                
+                return hvp_func
+
+
+            def block_lanczos(self, hvp_func, dim, k=10, block_size=4):
+                """
+                分块Lanczos算法
+                其中超参数 k 是迭代次数，block_size 是块的大小。
+                
+                """
+                logger.debug(f'***5***--5-3**5 begin block_lanczos() ')
+                # 初始化分块正交基
+                Q = torch.zeros((k+1)*block_size, dim, device=self.device)
+                T = torch.zeros(k*block_size, k*block_size, device=self.device)
+
+                # 生成初始分块
+                V = torch.randn(dim, block_size, device=self.device)
+                V, _ = torch.linalg.qr(V)  # 正交化
+                Q[:block_size] = V.T
+
+                for i in range(k):
+                    start_idx = i * block_size
+                    # 计算Hessian作用
+                    HV = torch.stack([hvp_func(Q[start_idx + j]) for j in range(block_size)])
+                    
+                    # 正交化过程
+                    for j in range(start_idx, start_idx + block_size):
+                        T[j, :j+1] = Q[:j+1] @ HV[j-start_idx]  # 计算三对角矩阵 T
+                        
+                        # 🔹 在计算前检查形状
+                        # logger.debug(f"🔹 Q[:j+1].shape: {Q[:j+1].shape}")
+                        # logger.debug(f"🔹 Q[:j+1].T.shape: {Q[:j+1].T.shape}")
+                        # logger.debug(f"🔹 T[j, :j+1].shape: {T[j, :j+1].shape}")
+                        # logger.debug(f"🔹 T[j, :j+1].unsqueeze(1).shape: {T[j, :j+1].unsqueeze(1).shape}")
+                        # logger.debug(f"🔹 HV[j-start_idx].shape: {HV[j-start_idx].shape}")
+
+                        # ✅ 修正形状
+                        HV[j-start_idx] -= (Q[:j+1].T @ T[j, :j+1].unsqueeze(1)).squeeze()
+                    
+                    # QR分解
+                    V, R = torch.linalg.qr(HV.T) # 正交化
+                    Q[start_idx+block_size:start_idx+2*block_size] = V.T
+
+                    # ✅ 修正错误：确保索引范围不会为空
+                    if start_idx+block_size < T.shape[0]:  
+                        end_row = min(start_idx+2*block_size, T.shape[0])
+                        end_col = min(start_idx+block_size, T.shape[1])
+
+                        # logger.debug(f"🔹 Updating T matrix at [{start_idx+block_size}:{end_row}, {start_idx}:{end_col}]")
+
+                        T[start_idx+block_size:end_row, start_idx:end_col] = R.T
+                    else:
+                        logger.debug(f"❌ Skipping T update at [{start_idx+block_size}:{end_row}, {start_idx}:{end_col}] to prevent empty slice.")
+
+
+                # 计算特征值
+                T_np = T.cpu().numpy()
+                eigvals = np.linalg.eigvalsh(T_np)
+                return eigvals[-block_size:]  # 返回最大特征值
+
+        # --------------------- 主计算流程 ---------------------
+        logger.debug(f'***5***--5-3**3 begin main loop   ')
+        # 只存储初始状态（不带梯度）,用于恢复模型状态
+        original_params_to_calculate_hessian = {}
+        if flag_lora:
+            # 如果要评估的模型是使用lora方法训练得到的
+            Flag_Nlora_task = False
+            Flag_Nlora_full = False
+            Flag_lora = True
+
+            # 保存路径
+            hessian_file_lora = os.path.join(output_dir, f"{name}_lora_only-predictDataset_lanczos.h5")
+
+            dom_eigs_lora = []
+
+            # 获取需要计算梯度 和 Hessian 矩阵的 参数信息
+            # 对于lora方法，只计算lora_部分的 梯度 和 Hessian 矩阵
+            lora_params = {}
+            for name, param in model.named_parameters():
+                if name.find("lora_") != -1:
+                        lora_params[name] = param
+                        original_params_to_calculate_hessian[name] = param.data.clone()
+        
+        elif  flag_Nlora_full:
+            # 如果要评估的模型是使用N_lora方法训练得到的
+            # 并且这里要进行评估的对象是 模型所有与Lora相关的部分（newlora_ lora_）
+            Flag_Nlora_task = False  
+            Flag_Nlora_full = True 
+            Flag_lora = False
+
+            # 保存路径
+            hessian_file_Nlora_fulllora = os.path.join(output_dir, f"{name}_Nlora_full-predictDataset.h5")
+        
+            # 获取需要计算梯度 和 Hessian 矩阵的 参数信息
+            # 对于Nlora方法，
+            # 由于是flag_Nlora_full ，所以计算lora_和 newlora_ 部分的 梯度 和 Hessian 矩阵
+            dom_eigs_Nlora_lora = []
+            Nlora_params_lora = {}
+            for name, param in model.named_parameters():
+                if name.find("loranew_") != -1:
+                    # 当使用Nlora 方法时，需要对lora_ 和 loranew_ 进行区分
+                    Nlora_params_lora[name] = param
+                    original_params_to_calculate_hessian[name] = param.data.clone()
+                elif name.find("lora_") != -1:
+                # 当使用lora 方法时，只有一个 lora的部分 进行扰动只考虑 lora 的部分，即只更新
+                    Nlora_params_lora[name] = param
+                    original_params_to_calculate_hessian[name] = param.data.clone()
+        
+        elif (not flag_Nlora_full):
+            # 如果要评估的模型是使用N_lora方法训练得到的
+            # 并且这里要进行评估的对象是 模型只与Lora相关的部分（newlora_ ）
+            Flag_Nlora_task = True 
+            Flag_Nlora_full = False
+            Flag_lora = False
+
+            hessian_file_Nlora_tasklora = os.path.join(output_dir, f"{name}_Nlora_only-predictDataset.h5")
+        
+
+            # 获取需要计算梯度 和 Hessian 矩阵的 参数信息
+            # 对于Nlora方法，
+            # 由于是flag_Nlora_task ，所以只计算 newlora_ 部分的 梯度 和 Hessian 矩阵
+            dom_eigs_Nlora_tasklora = []
+            Nlora_params_tasklora = {}
+            for name, param in model.named_parameters():
+                if name.find("loranew_") != -1:
+                    # 当使用Nlora 方法时，需要对lora_ 和 loranew_ 进行区分
+                    # 进行扰动只考虑 loranew 的部分，即只更新  与任务有关的那一部分 lora
+                    Nlora_params_tasklora[name] = param
+                    original_params_to_calculate_hessian[name] = param.data.clone()
+
+        
+        calculator = HessianCalculator(model, device)
+
+
+        try:
+            for batch in tqdm(all_batches, desc=f"Rank {rank}: Processing"):
+                
+                # 恢复参数时仅操作需要修改的部分（优化点1）
+                for name in original_params_to_calculate_hessian:
+                    model.state_dict()[name].copy_(original_params_to_calculate_hessian[name])
+    
+
+                if Flag_lora:
+                    logger.debug(f'***5***--5-3**Model device: {next(model.parameters()).device},Batch device: {next(iter(batch.values())).device} ')
+                    logger.debug(f"Type of lora_params: {type(lora_params)}")
+                    # logger.debug(f"Example entry in lora_params: {list(lora_params.items())[:5]}")  # 只打印前5个
+                    logger.debug(f"Type of original_params_to_calculate_hessian: {type(original_params_to_calculate_hessian)}")
+                    # logger.debug(f"Example original_params_to_calculate_hessian: {list(original_params_to_calculate_hessian.items())[:5]}")  # 只打印前5个
+                    
+                    hvp_lora = calculator.compute_hvp(batch, lora_params)
+                    eigvals = calculator.block_lanczos(hvp_lora, dim=sum(p.numel() for p in lora_params.values()))
+                    dom_eigs_lora.extend(eigvals.tolist())
+                    # tridiag = calculator.lanczos_algorithm(hvp_lora, dim=sum(p.numel() for p in lora_params.values()))
+                    # dom_eigs_lora.extend(torch.linalg.eigvalsh(tridiag).tolist())
+
+                # 计算LoRA Hessian
+                elif Flag_Nlora_full:
+
+                    logger.debug(f'***5***--5-3**Model device: {next(model.parameters()).device},Batch device: {next(iter(batch.values())).device} ')
+                    logger.debug(f"Type of lora_params: {type(Nlora_params_lora)}")
+                    # logger.debug(f"Example entry in lora_params: {list(lora_params.items())[:5]}")  # 只打印前5个
+                    logger.debug(f"Type of original_params_to_calculate_hessian: {type(original_params_to_calculate_hessian)}")
+                    # logger.debug(f"Example original_params_to_calculate_hessian: {list(original_params_to_calculate_hessian.items())[:5]}")  # 只打印前5个
+                    
+
+                    hvp_Nlora_lora = calculator.compute_hvp(batch,Nlora_params_lora)
+                    eigvals = calculator.block_lanczos(hvp_Nlora_lora, dim=sum(p.numel() for p in Nlora_params_lora.values()))
+                    dom_eigs_Nlora_lora.extend(eigvals.tolist())
+                
+
+                elif (not Flag_Nlora_full):
+
+                    logger.debug(f'***5***--5-3**Model device: {next(model.parameters()).device},Batch device: {next(iter(batch.values())).device} ')
+                    logger.debug(f"Type of lora_params: {type(Nlora_params_tasklora)}")
+                    # logger.debug(f"Example entry in lora_params: {list(lora_params.items())[:5]}")  # 只打印前5个
+                    logger.debug(f"Type of original_params_to_calculate_hessian: {type(original_params_to_calculate_hessian)}")
+                    # logger.debug(f"Example original_params_to_calculate_hessian: {list(original_params_to_calculate_hessian.items())[:5]}")  # 只打印前5个
+                    
+                    hvp_Nlora_tasklora = calculator.compute_hvp(batch,Nlora_params_tasklora)
+                    eigvals = calculator.block_lanczos(hvp_Nlora_tasklora, dim=sum(p.numel() for p in Nlora_params_tasklora.values()))
+                    dom_eigs_Nlora_tasklora.extend(eigvals.tolist())
+
+                # 内存清理
+                torch.cuda.empty_cache()
+
+        except RuntimeError as e:
+            logger.error(f"Hessian计算失败: {str(e)}")
+            if "CUDA out of memory" in str(e):
+                logger.warning("尝试启用梯度检查点...")
+               
+            
+
+        # --------------------- 结果处理与保存 ---------------------
+        logger.debug(f'***5***--5-3**6 begin save ')
+        # 分布式结果聚合（改进点11）
+        # 分布式结果聚合
+        if torch.distributed.is_initialized():
+            world_size = torch.distributed.get_world_size()
+            
+            # 选择需要聚合的变量
+            if Flag_lora:
+                dom_eigs_tensor = torch.tensor(dom_eigs_lora, device=device)
+                hessian_file = hessian_file_lora
+            elif Flag_Nlora_task :
+                dom_eigs_tensor = torch.tensor(dom_eigs_Nlora_tasklora, device=device)
+                hessian_file = hessian_file_Nlora_tasklora
+            elif Flag_Nlora_full:
+                dom_eigs_tensor = torch.tensor(dom_eigs_Nlora_lora, device=device)
+                hessian_file = hessian_file_Nlora_fulllora
+            else:
+                dom_eigs_tensor, hessian_file = None, None
+
+            # 仅当满足某个条件时才执行分布式聚合
+            if dom_eigs_tensor is not None:
+                all_dom_eigs = [torch.zeros_like(dom_eigs_tensor) for _ in range(world_size)]
+                torch.distributed.all_gather(all_dom_eigs, dom_eigs_tensor)
+                dom_eigs = torch.cat(all_dom_eigs, dim=0).cpu().numpy().tolist()
+
+                # 计算统计指标
+                stats = self._compute_stats(dom_eigs)
+
+        # 仅 rank=0 进程保存 HDF5 结果，避免冲突
+        if rank == 0 and hessian_file is not None:
+            with h5py.File(hessian_file, "w") as hf:
+                hf.attrs["created_at"] = datetime.now().isoformat()
+                hf.attrs["model_type"] = type(model).__name__
+                for k, v in stats.items():
+                    hf.create_dataset(k, data=v)
+                hf.create_dataset("dominant_eigs", data=np.array(dom_eigs))
+
+            logger.debug(f"计算完成，结果保存至 {hessian_file} 文件")
+
+
+        # 添加进程同步 & 关闭分布式进程
+        if torch.distributed.is_initialized():
+            logger.debug("所有进程同步中...")
+            torch.distributed.barrier()  # 确保所有进程都完成再继续
+
+            if torch.distributed.get_rank() == 0:
+                logger.debug("所有进程已完成计算，开始关闭分布式进程...")
+
+            torch.distributed.destroy_process_group()  # 释放 NCCL 资源
+            logger.debug("分布式进程已正确关闭")
         return True
