@@ -7,6 +7,7 @@ from transformers.trainer_callback import TrainerCallback
 from uie_collator import SUPPORTED_DECODER_MODELS, check_model
 from uie_dataset_lora import ANSWER_PREFIX
 
+from datatime import datatime
 
 def skip_instructions(model, predictions_ids, tokenizer, ignore_idx=-100):
     predictions_ids = np.where(
@@ -74,7 +75,9 @@ class UIETrainer(Seq2SeqTrainer):
         model.train()
         inputs = self._prepare_inputs(inputs)
 
+        # SageMaker MP 特殊处理 
         if is_sagemaker_mp_enabled():
+            # DeepSpeed 在 backward 里自动处理梯度缩放与累加
             loss_mb = smp_forward_backward(
                 model, inputs, self.args.gradient_accumulation_steps)
             return loss_mb.reduce_mean().detach().to(self.args.device)
