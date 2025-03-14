@@ -475,11 +475,13 @@ class UIETrainer(Seq2SeqTrainer):
         model = self._wrap_model(model, training=False)
 
         # ✅ 处理 FP16/BF16 评估模式
+        # if full fp16 or bf16 eval is wanted and this ``evaluation`` or ``predict`` isn't called
+        # while ``train`` is running, cast it to the right dtype first and then put on device
         if not self.is_in_train:
             if args.fp16_full_eval:
-                model = model.to(dtype=torch.float16, device=device)
+                model = model.to(dtype=torch.float16, device=args.device)
             elif args.bf16_full_eval:
-                model = model.to(dtype=torch.bfloat16, device=device)
+                model = model.to(dtype=torch.bfloat16, device=args.device)
 
         model = model.to(device=device)
         model.eval()  # 确保模型在 eval 模式
@@ -606,7 +608,7 @@ class UIETrainer(Seq2SeqTrainer):
                 total_loss = 0.0
                 for batch in all_batches:
                     inputs = {k: v.to(device) for k, v in batch.items()}
-                    with torch.cuda.amp.autocast(enabled=args.fp16):  # 支持混合精度
+                    with torch.cuda.amp.autocast(enabled=args.fp16_full_eval):  # 支持混合精度
                         outputs = model(**inputs)
                         loss = F.cross_entropy(
                             outputs.logits.view(-1, outputs.logits.size(-1)),
@@ -689,14 +691,32 @@ class UIETrainer(Seq2SeqTrainer):
         model = self._wrap_model(model, training=False)
         
         # 混合精度处理
+        # if full fp16 or bf16 eval is wanted and this ``evaluation`` or ``predict`` isn't called
+        # while ``train`` is running, cast it to the right dtype first and then put on device
+
+        # 输出 batch 和参数的类型
+        logger.debug(
+            f'5***--5-3**1 Model device: {next(model.parameters()).device}, '
+            f'Model param type: {next(model.parameters()).dtype}, '
+        )
+        
         if not self.is_in_train:
+            logger.debug(f'args.fp16_full_eval:{args.fp16_full_eval}, args.bf16_full_eval:{args.bf16_full_eval}')
             if args.fp16_full_eval:
-                model = model.to(dtype=torch.float16, device=device)
+                model = model.to(dtype=torch.float16, device=args.device)
             elif args.bf16_full_eval:
-                model = model.to(dtype=torch.bfloat16, device=device)
+                model = model.to(dtype=torch.bfloat16, device=args.device)
         
         model = model.to(device=device)
+
         model.eval()
+
+        # 输出 batch 和参数的类型
+        logger.debug(
+            f'5***--5-3**1 Model device: {next(model.parameters()).device}, '
+            f'Model param type: {next(model.parameters()).dtype}, '
+        )
+
 
         logger.debug(f'***5***--LORA Hessian**1 finish init ')
 
@@ -963,10 +983,20 @@ class UIETrainer(Seq2SeqTrainer):
                 for name in original_params_to_calculate_hessian:
                     model.state_dict()[name].copy_(original_params_to_calculate_hessian[name])
     
-
+                # 输出 batch 和参数的类型
+                logger.debug(
+                    f'***5***--5-3**Model device: {next(model.parameters()).device}, '
+                    f'Model param type: {next(model.parameters()).dtype}, '
+                    f'Batch device: {next(iter(batch.values())).device}, '
+                    f'Batch type: {next(iter(batch.values())).dtype}'
+                )
+                
                 if Flag_lora:
-                    logger.debug(f'***5***--5-3**Model device: {next(model.parameters()).device},Batch device: {next(iter(batch.values())).device} ')
                     logger.debug(f"Type of lora_params: {type(lora_params)}")
+
+                    first_param = next(iter(lora_params.values()))
+                    logger.debug(f"First param dtype: {first_param.dtype}, device: {first_param.device}")
+
                     # logger.debug(f"Example entry in lora_params: {list(lora_params.items())[:5]}")  # 只打印前5个
                     logger.debug(f"Type of original_params_to_calculate_hessian: {type(original_params_to_calculate_hessian)}")
                     # logger.debug(f"Example original_params_to_calculate_hessian: {list(original_params_to_calculate_hessian.items())[:5]}")  # 只打印前5个
@@ -980,8 +1010,11 @@ class UIETrainer(Seq2SeqTrainer):
                 # 计算LoRA Hessian
                 elif Flag_Nlora_full:
 
-                    logger.debug(f'***5***--5-3**Model device: {next(model.parameters()).device},Batch device: {next(iter(batch.values())).device} ')
-                    logger.debug(f"Type of lora_params: {type(Nlora_params_lora)}")
+                    logger.debug(f"Type of Nlora_params_lora: {type(Nlora_params_lora)}")
+
+                    first_param = next(iter(Nlora_params_lora.values()))
+                    logger.debug(f"First param dtype: {first_param.dtype}, device: {first_param.device}")
+
                     # logger.debug(f"Example entry in lora_params: {list(lora_params.items())[:5]}")  # 只打印前5个
                     logger.debug(f"Type of original_params_to_calculate_hessian: {type(original_params_to_calculate_hessian)}")
                     # logger.debug(f"Example original_params_to_calculate_hessian: {list(original_params_to_calculate_hessian.items())[:5]}")  # 只打印前5个
@@ -992,10 +1025,13 @@ class UIETrainer(Seq2SeqTrainer):
                     dom_eigs_Nlora_lora.extend(eigvals.tolist())
                 
 
-                elif (not Flag_Nlora_full):
+                else:
 
-                    logger.debug(f'***5***--5-3**Model device: {next(model.parameters()).device},Batch device: {next(iter(batch.values())).device} ')
-                    logger.debug(f"Type of lora_params: {type(Nlora_params_tasklora)}")
+                    logger.debug(f"Type of Nlora_params_tasklora: {type(Nlora_params_tasklora)}")
+
+                    first_param = next(iter(Nlora_params_tasklora.values()))
+                    logger.debug(f"First param dtype: {first_param.dtype}, device: {first_param.device}")
+
                     # logger.debug(f"Example entry in lora_params: {list(lora_params.items())[:5]}")  # 只打印前5个
                     logger.debug(f"Type of original_params_to_calculate_hessian: {type(original_params_to_calculate_hessian)}")
                     # logger.debug(f"Example original_params_to_calculate_hessian: {list(original_params_to_calculate_hessian.items())[:5]}")  # 只打印前5个

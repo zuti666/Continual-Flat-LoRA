@@ -150,58 +150,15 @@ def plot_hessian_power_iteration(h5_file, title="Hessian Power Iteration Statist
 
 
 if __name__ == "__main__":
-    # hessian_full_file = "path/to/hessian_full_model_matrix.h5"
-    # hessian_lora_file = "path/to/hessian_lora_only_matrix.h5"
-
-    # 修改以下文件路径为实际保存的文件路径
-    # loss_landscape_full_file = "logs_and_outputs/order_1/outputs/1-dbpedia/full_loss_full_model_landscape.h5"
-    # loss_landscape_lora_file = "logs_and_outputs/order_1/outputs/1-dbpedia/full_loss_lora_only_landscape.h5"
-    # # 绘制 Loss Landscape
-    # save_pth_full = 'logs_and_outputs/order_1/outputs/1-dbpedia/full_loss_full_model_landscape'
-    # save_pth_lora = 'logs_and_outputs/order_1/outputs/1-dbpedia/full_loss_lora_model_landscape'
-
-
-    # # 修改以下文件路径为实际保存的文件路径
-    # loss_landscape_full_file = "logs_and_outputs_lora/order_1/outputs/2-amazon/full_loss_full_model_landscape.h5"
-    # loss_landscape_lora_file = "logs_and_outputs_lora/order_1/outputs/2-amazon/full_loss_lora_only_landscape.h5"
-    # 绘制 Loss Landscape
-    # save_p+th_full = 'logs_and_outputs_lora/order_1/outputs/2-amazon/full_loss_full_model_landscape'
-    # save_pth_lora = 'logs_and_outputs_lora/order_1/outputs/2-amazon/full_loss_lora_model_landscape'
-
-
-    # # 修改以下文件路径为实际保存的文件路径
-    # loss_landscape_full_file = "logs_and_outputs_lora/order_1/outputs/3-yahoo/full_loss_full_model_landscape.h5"
-    # loss_landscape_lora_file = "logs_and_outputs_lora/order_1/outputs/3-yahoo/full_loss_lora_only_landscape.h5"
-    # # 绘制 Loss Landscape
-    # save_pth_full = 'logs_and_outputs_lora/order_1/outputs/3-yahoo/full_loss_full_model_landscape'
-    # save_pth_lora = 'logs_and_outputs_lora/order_1/outputs/3-yahoo/full_loss_lora_model_landscape'
-
-
-    # 修改以下文件路径为实际保存的文件路径
-    # loss_landscape_full_file = "logs_and_outputs_lora/order_1/outputs/4-agnews/full_loss_full_model_landscape.h5"
-    # loss_landscape_lora_file = "logs_and_outputs_lora/order_1/outputs/4-agnews/full_loss_lora_only_landscape.h5"
-    # # 绘制 Loss Landscape
-    # save_pth_full = 'logs_and_outputs_lora/order_1/outputs/4-agnews/full_loss_full_model_landscape'
-    # save_pth_lora = 'logs_and_outputs_lora/order_1/outputs/4-agnews/full_loss_lora_model_landscape'
-
-
-    # plot_hessian_stats(loss_landscape_full_file, title="Model Loss Landscape",savepth = save_pth_full)
-    # plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
     
-    # 绘制 Hessian 统计数据
-    # plot_hessian_stats(hessian_full_file, title="Full Model Hessian Statistics")
-    # plot_hessian_stats(hessian_lora_file, title="LoRA Only Hessian Statistics")
+    """--------- lora  method -10 """
 
-
-
-    # --------- lora  method -10
-
-    # Eval 1-1 lora  T5-small  loss landscape  order1
+    """------------------Eval 1-1 lora  T5-small  hessian  order1--------------------- """
     #  order1 - 1-dbpedia
-    # loss_landscape_lora_file = "logs_and_outputs_T5small_lora/order_1/outputs/1-dbpedia/adapter_T5small_lora-10/hessian_lora_only-predictDataset.h5"
-    # save_pth_lora =            'logs_and_outputs_T5small_lora/order_1/outputs/1-dbpedia/adapter_T5small_lora-10/Hessian_T5small-10_lora'
+    # loss_landscape_lora_file = "logs_and_outputs/order_1/outputs/1-dbpedia/1_original_LoRA/hessian_lora_only-predictDataset_lanczos.h5"
+    # save_pth_lora =            'logs_and_outputs/order_1/outputs/1-dbpedia/1_original_LoRA/Hessian_T5small-10_lora'
     # plot_hessian_stats(loss_landscape_lora_file, title="Hessian matrix",savepth = save_pth_lora)
-    # #  order1 - 2-amazon
+    #  order1 - 2-amazon
     # loss_landscape_lora_file = "logs_and_outputs_T5small_lora/order_1/outputs/2-amazon/adapter_T5small_lora-10/hessian_lora_only-predictDataset.h5"
     # save_pth_lora =            'logs_and_outputs_T5small_lora/order_1/outputs/2-amazon/adapter_T5small_lora-10/Hessian_T5small-10_lora'
     # plot_hessian_stats(loss_landscape_lora_file, title="Hessian matrix",savepth = save_pth_lora)
@@ -221,7 +178,7 @@ if __name__ == "__main__":
 
 
 
-    #------------------Eval 1-1 lora  T5-small  loss landscape  order2------------------------
+    """------------------Eval 1-1 lora  T5-small  loss landscape  order2------------------------ """
     # #  order1 - 1-yahoo
     # loss_landscape_lora_file = "logs_and_outputs_T5small_lora/order_2/outputs/1-dbpedia/adapter_T5small_lora-10/hessian_lora_only-predictDataset_lanczos.h5"
     # save_pth_lora =            'logs_and_outputs_T5small_lora/order_2/outputs/1-dbpedia/adapter_T5small_lora-10/hessian_T5small-10_lora'
@@ -241,7 +198,7 @@ if __name__ == "__main__":
     
 
 
-    #------------------Eval 1-1 lora  T5-small  loss landscape  order3------------------------
+    """------------------Eval 1-1 lora  T5-small  loss landscape  order3------------------------ """
     # #  order1 - 1-yahoo
     # loss_landscape_lora_file = "logs_and_outputs_T5small_lora/order_3/outputs/1-yahoo/adapter_T5small_lora-10/hessian_lora_only-predictDataset_lanczos.h5"
     # save_pth_lora =            'logs_and_outputs_T5small_lora/order_3/outputs/1-yahoo/adapter_T5small_lora-10/hessian_T5small-10_lora'
@@ -260,21 +217,21 @@ if __name__ == "__main__":
     # plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
 
 
-    #------------------Eval 1-1 Nlora   only task T5-small  loss landscape  order1------------------------
-    #order1 - 1-dbpedia
-    loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/1-dbpedia/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
-    save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/1-dbpedia/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
-    plot_hessian_stats(loss_landscape_lora_file, title="NLoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
-    #  order1 - 2-amazon
-    loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/2-amazon/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
-    save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/2-amazon/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
-    plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
-    #  order1 - 3-yahoo
-    loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/3-yahoo/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
-    save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/3-yahoo/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
-    plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
-    #  order1 - 4-agnews
-    loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/4-agnews/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
-    save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/4-agnews/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
-    plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
+    """------------------Eval 1-1 Nlora   only task T5-small  loss landscape  order1------------------------"""
+    # order1 - 1-dbpedia
+    # loss_landscape_lora_file = "logs_and_outputs/order_1/outputs/1-dbpedia/1_modifiedNLoRA_fullLoRA/hessian_Nlora_full-predictDataset.h5"
+    # save_pth_lora =            'logs_and_outputs/order_1/outputs/1-dbpedia/1_modifiedNLoRA_fullLoRA/hessian_Nlora_onlytask'
+    # plot_hessian_stats(loss_landscape_lora_file, title="NLoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # #  order1 - 2-amazon
+    # loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/2-amazon/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
+    # save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/2-amazon/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
+    # plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # #  order1 - 3-yahoo
+    # loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/3-yahoo/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
+    # save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/3-yahoo/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
+    # plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # #  order1 - 4-agnews
+    # loss_landscape_lora_file = "logs_and_outputs_T5small_Nlora/order_1/outputs/4-agnews/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_only-predictDataset.h5"
+    # save_pth_lora =            'logs_and_outputs_T5small_Nlora/order_1/outputs/4-agnews/adapter_T5small_Nlora_onlytasknew-10/hessian_Nlora_onlytask'
+    # plot_hessian_stats(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
     
