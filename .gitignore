@@ -1,5 +1,5 @@
 # 忽略根目录下的 initial_model 文件夹
-/initial_model/
+/initial_model_*/
 
 # 忽略所有以 logs_ 开头的文件夹（仅限根目录）
 /logs_*/
