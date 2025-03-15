@@ -9,8 +9,8 @@ port=$(shuf -i25000-30000 -n1)
  
 # bash scripts/order_1.sh> logs_and_outputs/order_1/logs/train_and_infer.log 2>&1 &
 
-CUDA_VISIBLE_DEVICES=3 deepspeed --master_port $port src/run_eval_NLoRA-Liying.py \
-   --do_train False \
+CUDA_VISIBLE_DEVICES=0 deepspeed --master_port $port src/run_eval_NLoRA-Liying.py \
+   --do_train True \
    --do_predict True \
    --do_flatminal True \
    --flag_originLoRA True \
@@ -18,12 +18,12 @@ CUDA_VISIBLE_DEVICES=3 deepspeed --master_port $port src/run_eval_NLoRA-Liying.p
    --flag_modifiedNLoRA_fullLoRA False \
    --flag_modifiedNLoRA_taskLoRA False \
    --predict_with_generate \
-   --model_name_or_path logs_and_outputs_T5small/order_1/outputs/1-dbpedia/1_original_LoRA/adapter \
+   --model_name_or_path initial_model/t5-small \
    --data_dir CL_Benchmark \
    --task_config_dir configs/order1_configs/dbpedia \
    --instruction_file configs/instruction_config.json \
    --instruction_strategy single \
-   --output_dir logs_and_outputs_T5small/order_1/outputs/1-dbpedia \
+   --output_dir logs-outputs_T5/order_1/outputs/1-dbpedia \
    --per_device_train_batch_size 16 \
    --per_device_eval_batch_size 64 \
    --gradient_accumulation_steps 1 \
