@@ -14,6 +14,7 @@
 
 # 忽略缓存文件
 *.pyc
+*.pyo
 
 # 忽略 Python 缓存目录
 **/__pycache__/
