@@ -75,10 +75,10 @@ if __name__ == "__main__":
 
     """ ------------------Eval 1-1 lora  T5-small  loss landscape  order1------------------------ """
     #  order1 - 1-dbpedia
-    loss_landscape_lora_file = "logs_and_outputs/order_1/outputs/1-dbpedia/1_original_LoRA/lossShape_lora_only-evalDataset-orial.h5"
-    save_pth_lora =            'logs_and_outputs/order_1/outputs/1-dbpedia/1_original_LoRA/lossShape_T5small-10_lora'
-    plot_loss_landscape(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
-    #  order1 - 2-amazon
+    # loss_landscape_lora_file = "logs_and_outputs/order_1/outputs/1-dbpedia/1_original_LoRA/lossShape_lora_only-evalDataset-orial.h5"
+    # save_pth_lora =            'logs_and_outputs/order_1/outputs/1-dbpedia/1_original_LoRA/lossShape_T5small-10_lora'
+    # plot_loss_landscape(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # #  order1 - 2-amazon
     # loss_landscape_lora_file = "logs_and_outputs_T5small_lora/order_1/outputs/2-amazon/adapter_T5small_lora-10/lossShape_lora_only-predictDataset-orial.h5"
     # save_pth_lora =            'logs_and_outputs_T5small_lora/order_1/outputs/2-amazon/adapter_T5small_lora-10/lossShape_T5small-10_lora'
     # plot_loss_landscape(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
@@ -176,4 +176,11 @@ if __name__ == "__main__":
     # plot_loss_landscape(loss_landscape_lora_file, title="LoRA Dispeturb Loss Landscape",savepth = save_pth_lora)
     
 
+    """------------------Eval T5 initial model------------------------"""
+    # order1 - 1-dbpedia 
+    loss_landscape_lora_file = "initial_model/t5-small/lossShape_lora_only-predictDataset.h5"
+    # save_pth_lora =            'initial_model/t5-small/lossShape_originModel_fullWeight'
+    save_pth_lora =            'initial_model/t5-small/lossShape_originModel_lora_beforeTrain'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    
     

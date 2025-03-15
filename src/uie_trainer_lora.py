@@ -418,7 +418,7 @@ class UIETrainer(Seq2SeqTrainer):
 
     def compute_loss_landscape(
         self,   flatminal_dataset: Dataset, output_dir, name="lossLandscape", x_range=(-1, 1), y_range=(-1, 1), num_points=20, max_batches=5,
-        sample_batches=False, flag_lora=True, flag_Nlora_full=True
+        sample_batches=False, flag_lora=True, flag_Nlora_full= False , flag_FullModel =  False,
     ):
         """
         计算损失景观，并分别计算:
@@ -426,46 +426,22 @@ class UIETrainer(Seq2SeqTrainer):
         2️⃣ **仅 LoRA 适配器（LoRA Adapter）** 的损失景观
         计算损失景观，并分别计算完整模型 & LoRA Adapter 的损失表面。
         针对大模型使用多 GPU，可以并行分配 (i, j) 坐标网格。
+        flag_FullModel : 是否对模型的所有参数都进行扰动
+        flag_lora :  是否对lora_进行扰动
+        flag_Nlora_full： 是否对 lora_new 和 lora_ 都进行扰动
         """
         args = self.args
         device = args.device
         # 最终损失网络的数值
         loss_grid = np.zeros((num_points, num_points))
 
-        # 根据需要评估的模型判断，设置Flag，供后面 干扰模型的参数
-        if flag_lora:
-            # 如果是 lora 方法，干扰 lora 部分
-            Flag_Nlora_task = False
-            Flag_Nlora_full = False
-            Flag_lora = True
-
-            # 保存路径
-            surf_file_lora = os.path.join(
-                output_dir, f"{name}_lora_only-evalDataset-orial.h5")
-            surf_file = surf_file_lora
-
-        elif flag_Nlora_full:
-            Flag_Nlora_task = False
-            Flag_Nlora_full = True
-            Flag_lora = False
-
-            surf_file_Nlora_full = os.path.join(
-                output_dir, f"{name}_Nlora_full-predictDataset.h5")
-            surf_file = surf_file_Nlora_full
-        else:
-            Flag_Nlora_task = True
-            Flag_Nlora_full = False
-            Flag_lora = False
-
-            surf_file_Nlora_tasklora = os.path.join(
-                output_dir, f"{name}_Nlora_onlytask-predictDataset-2.h5")
-            surf_file = surf_file_Nlora_tasklora
+        
             
 
         # ✅ 记录日志信息
         logger.debug(f'***5***--5-2 **1 compute_loss_landscape  ')
         logger.debug(
-            f"***** Running Loss Landscape Calculation on expriment Nlora_task:{Flag_Nlora_task} ,Nlora_full:{Flag_Nlora_full}  lora:{Flag_lora}*****")
+            f"***** Running Loss Landscape Calculation on expriment ,Nlora_full:{flag_Nlora_full}  lora:{flag_lora}*****")
         logger.debug(
             f"Output Dir = {output_dir}，Output File :{surf_file} Num points = {num_points}x{num_points} max_batches = {max_batches}")
 
@@ -491,19 +467,26 @@ class UIETrainer(Seq2SeqTrainer):
         # 根据不同的微调方法（Nlora或lora）确定需要保存原始值的参数
         original_params_to_perturb = {}
         for name, param in model.named_parameters():
-            # 当使用Nlora方法时
-            if Flag_Nlora_task and (not Flag_Nlora_full):
-                # 只保存与任务相关的新增lora参数（loranew_开头），且排除共享参数
-                if name.find("loranew_") != -1 and name.find("shared") == -1:
+            
+            if flag_FullModel: # 如果是对所有参数都进行干扰，
+                original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{name}_fullModel-predictDataset.h5")
+            elif flag_lora:  # 当不使用全部模型的参数，并且使用标准lora方法时
+                # 保存所有lora参数（lora_开头），且排除共享参数
+                if "lora_" in name and name.find("shared") == -1:
                     original_params_to_perturb[name] = param.data.clone()
-            elif Flag_Nlora_task and (Flag_Nlora_full):
+                surf_file = os.path.join(output_dir, f"{name}_lora_only-predictDataset.h5")
+
+            elif flag_Nlora_full: # 当不使用全部模型的参数，不使用标准lora方法，使用Nlora方法并且干扰所有相关 lora_,loranew_模型时候
                 if ("loranew_" in name or "lora_" in name) and "shared" not in name:
                     original_params_to_perturb[name] = param.data.clone()
-            # 当使用标准lora方法时,或者是Nlora方法的full 进行评估
-            elif Flag_lora:
-                # 保存所有lora参数（lora_开头），且排除共享参数
-                if name.find("lora_") != -1 and name.find("shared") == -1:
+                surf_file = os.path.join(output_dir, f"{name}_Nlora_full-predictDataset.h5")
+                
+            else:
+                if "loranew_" in name and "shared" not in name:
                     original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{name}_Nlora_onlytask-predictDataset.h5")
+
 
         # --------------------- 扰动生成优化 ---------------------
         torch.manual_seed(42)  # 固定随机种子保证可重复性
@@ -529,6 +512,7 @@ class UIETrainer(Seq2SeqTrainer):
                         d_x / (d_x.norm()**2)  # 施密特正交化
                     d_y = (d_y / d_y.norm()) * (param.norm() + 1e-8)     # 归一化
                     perturb_y[name] = d_y.to(device)
+
         # 使用FP16存储扰动（优化点5）
         if args.fp16_full_eval or args.bf16_full_eval:
             perturb_x = {k: v.half() for k, v in perturb_x.items()}

@@ -10,13 +10,14 @@ port=$(shuf -i25000-30000 -n1)
 # bash scripts/order_1.sh> logs_and_outputs/order_1/logs/train_and_infer.log 2>&1 &
 
 CUDA_VISIBLE_DEVICES=0 deepspeed --master_port $port src/run_eval_NLoRA-Liying.py \
-   --do_train True \
-   --do_predict True \
+   --do_train False \
+   --do_predict False\
    --do_flatminal True \
-   --flag_originLoRA True \
+   --flag_originLoRA False \
    --flag_modifiedNLoRA False \
    --flag_modifiedNLoRA_fullLoRA False \
    --flag_modifiedNLoRA_taskLoRA False \
+   --flag_disturb_fullModel True \
    --predict_with_generate \
    --model_name_or_path initial_model/t5-small \
    --data_dir CL_Benchmark \

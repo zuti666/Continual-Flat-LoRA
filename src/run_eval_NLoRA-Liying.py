@@ -53,6 +53,9 @@ from uie_trainer_lora import UIETrainer, DenserEvalCallback, skip_instructions
 from compute_metrics import compute_metrics, compute_grouped_metrics
 from model.llama import LlamaForCausalLM_with_lossmask
 
+
+from peft.utils import PromptLearningConfig
+
 # off wandb
 os.environ['WANDB_DISABLED'] = "True"
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -278,6 +281,12 @@ class UIETrainingArguments(Seq2SeqTrainingArguments):
     # 尝试添加自定义参数 ，flag_modified_taskLoRA 用来指示 当前方法为NLora方法,是否只对与任务有关的LoRA进行评估
     flag_modifiedNLoRA_taskLoRA: bool = field(
         default=False, metadata={"help": "Whether to do flatminal."})
+    
+    # 尝试添加自定义参数 ，flag_disturb_fullModel 用来指示, 是否对整个模型的参数进行扰动
+    flag_disturb_fullModel: bool = field(
+        default=False, metadata={"help": "Whether to do flatminal."})
+
+    
 
 
 def main():
@@ -357,7 +366,9 @@ def main():
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
+    logger.debug('***1***Load pretrained model and tokenizer**')
     if 'adapter' in model_args.model_name_or_path:  # load lora-config
+        logger.info(f'***1***-adapter  if {model_args.model_name_or_path}')
         config = PeftConfig.from_pretrained(model_args.model_name_or_path)
         if 'llama' in model_args.model_name_or_path.lower():
             tokenizer = transformers.LlamaTokenizer.from_pretrained(
@@ -372,6 +383,7 @@ def main():
             tokenizer = AutoTokenizer.from_pretrained(
                 config.base_model_name_or_path)
     elif 'llama' in model_args.model_name_or_path.lower():
+        logger.info(f'***1***1-llama  {model_args.model_name_or_path.lower()}')
         config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
             cache_dir=model_args.cache_dir,
@@ -392,6 +404,7 @@ def main():
         tokenizer.eos_token_id = 2
         tokenizer.pad_token_id = 1
     else:  # load original config
+        logger.info(f'***1***--1-else  {model_args.model_name_or_path}')
         config = AutoConfig.from_pretrained(
             model_args.config_name if model_args.config_name else model_args.model_name_or_path,
             cache_dir=model_args.cache_dir,
@@ -406,16 +419,21 @@ def main():
             use_auth_token=True if model_args.use_auth_token else None,
         )
 
+    logger.info('*****2***Load model_class**')
     if 'llama' in model_args.model_name_or_path.lower():  # add llama
+        logger.info(f'***2***--2-llama  {model_args.model_name_or_path.lower()}')
         model_class = LlamaForCausalLM_with_lossmask
         tokenizer.padding_side = 'left'
     else:
+        logger.info(f'***2***--2-else  {model_args.model_name_or_path.lower()}')
         model_class = AutoModelForSeq2SeqLM
 
     if 'adapter' in model_args.model_name_or_path:  # add lora-adapter to the original model
+        logger.info(f'***3***--3-adapter  {model_args.model_name_or_path}')
         model = model_class.from_pretrained(config.base_model_name_or_path)
         model = PeftModel.from_pretrained(model, model_args.model_name_or_path)
     elif 'llama' in model_args.model_name_or_path.lower():
+        logger.info(f'***3***--3-llama  {model_args.model_name_or_path.lower()}')
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -429,6 +447,7 @@ def main():
         )
         model = get_peft_model(model, peft_config)
     else:
+        logger.info(f'***3***--3-else  {model_args.model_name_or_path}')
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -437,9 +456,13 @@ def main():
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
+        logger.info(f'***3***--3- LoraConfig** task_type:{TaskType.SEQ_2_SEQ_LM},  ')
         peft_config = LoraConfig(
             task_type=TaskType.SEQ_2_SEQ_LM, inference_mode=False, r=model_args.lora_dim, lora_alpha=32, lora_dropout=0.1
         )
+        logger.info(f'***3***--3- LoraConfig** peft_config:{peft_config},  ')
+
+        logger.info(f'***3***--3- isinstance(peft_config, PromptLearningConfig):{isinstance(peft_config, PromptLearningConfig)},  ')
         model = get_peft_model(model, peft_config)
 
     model.resize_token_embeddings(len(tokenizer))
@@ -459,7 +482,17 @@ def main():
     # adapter_lora, adapter_Nlora
     # adapter_save_pth =  '/adapter'
 
+    # 尝试输出修改之前模型的所有参数
+
+    
     if training_args.do_train: 
+
+        for name, param in model.named_parameters():
+            logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+
+
+
+
         if training_args.flag_originLoRA:
             # 如果需要训练模型 并且使用的方法是LoRA 方法
             adapter_save_pth = '/adapter_lora'
@@ -484,6 +517,7 @@ def main():
                     param.requires_grad = False
         else:
             adapter_save_pth = '/adapter'
+    
 
     if (
             hasattr(model.config, "max_position_embeddings")
@@ -585,10 +619,13 @@ def main():
                     }) + "\n")
         return result
 
-    print(
-        f"-----Gradient checkpointing: {training_args.gradient_checkpointing} -----")
+    print(f"-----Gradient checkpointing: {training_args.gradient_checkpointing} -----")
     if training_args.gradient_checkpointing:
         model.gradient_checkpointing_enable()
+
+    print(f"***--------------UIETraine: model:{model} -----")
+    trainable_params = [n for n, p in model.named_parameters() if p.requires_grad]
+    logger.info(f'***4***-UIETrainer(model)-- args= trainable_params:{trainable_params}' )
 
     trainer = UIETrainer(
         model=model,
@@ -606,11 +643,18 @@ def main():
 
     # Training
     if training_args.do_train:
+
+
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
+
+        logger.info(f'***4***--4- checkpoint:{checkpoint},  ')
+        trainable_params = [n for n, p in trainer.model.named_parameters() if p.requires_grad]
+        logger.debug(f'*********4***--4 training_args.do_train trainable_params:{trainable_params}' )
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
         peft_model_id = training_args.output_dir + adapter_save_pth
@@ -623,6 +667,9 @@ def main():
                 train_dataset)
         )
         metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+
+        # 将训练日志也保存到 训练好的模型的路径下，这一个是全局参数，更改后，下面如果调用 do_eval也会保存在这个路径下
+        trainer.args.output_dir = training_args.output_dir + adapter_save_pth
 
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
@@ -648,10 +695,10 @@ def main():
 
         # 评估结果保存的路径依赖于 self.args.output_dir 
         # 这里可以设置保存的路径存储到对应的 adapter下
-        if training_args.do_train: 
-            #如果是训练完模型后在进行评估效果，保存到这次训练对应的adapter路径下
-            trainer.args.output_dir = training_args.output_dir + adapter_save_pth
-        else :
+        if (not training_args.do_train): 
+            #如果是训练完模型后在进行评估效果，保存到这次训练对应的adapter路径下，由于之前已经更改过这个参数所以不需要再更改
+            # trainer.args.output_dir = training_args.output_dir + adapter_save_pth
+        # else :
             # 如果不训练模型，而是直接加载训练后的模型进行分析 flatminal 
             # 则需要在这里保存输出的路径与加载的模型一致
             trainer.args.output_dir = model_args.model_name_or_path
@@ -691,19 +738,32 @@ def main():
     if training_args.do_flatminal:
 
         if  training_args.do_train :
-            # 如果先训练模型然后直接评估训练后的模型，
-            # 则输出路径应该与训练好的模型保存路径一致
-            analyse_model_path = training_args.output_dir + adapter_save_pth
+            # 如果进行训练，那么参数output_dir 已经被改变了 添加了 adapter 路径
+            analyse_model_path = training_args.output_dir
+            logger.debug(f"*** do_flatminal  save result in training_args.outpu_dir:{training_args.output_dir} ***")
         else :
         # 如果不训练模型，而是直接加载训练后的模型进行分析 flatminal 
         # 则需要在这里保存输出的路径与加载的模型一致
             analyse_model_path = model_args.model_name_or_path
+            logger.debug(f"*** do_flatminal  save result in model_args.model_name_or_path:{model_args.model_name_or_path}， ***")
 
         logger.debug(f"*** do_flatminal  save result in {analyse_model_path} ***")
 
+        # Debug 查看模型的参数到底是啥样子的，然后后面设置对哪些参数进行扰动
+        for name, param in model.named_parameters():
+            logger.debug(f'name:{name}, requires_grad:{param.requires_grad}')
+
+
 
         #设置需要进行评估的参数
-        if training_args.flag_originLoRA:
+        if training_args.flag_disturb_fullModel:
+            # 如果是要对模型的所有参数都进行评估
+            for name, param in model.named_parameters():
+                param.requires_grad = True
+
+        # 不改变整个模型的参数，只改变添加的lora部分的参数
+        elif training_args.flag_originLoRA:
+        
         # 如果需要评估模型 并且模型是LoRA方法训练得到的
         # 则需要将 模型的LoRA设置为可以更新的，以供计算Hessian矩阵使用
             for name, param in model.named_parameters():
@@ -736,6 +796,11 @@ def main():
                     # this module should always be frozen because we change the vocabulary
                     elif name.find("shared") != -1:
                         param.requires_grad = False
+        
+                
+
+
+
 
 
         
@@ -750,12 +815,12 @@ def main():
         # **1. 直接使用 trainer.model（已包含 LoRA 适配器）**
         # **3. 计算损失景观**
         logger.debug(f'***5***--5-2 compute_loss_landscape flag_lora={training_args.flag_originLoRA}, flag_Nlora={training_args.flag_originLoRA},output_dir={analyse_model_path}  ')
-        trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path, name="lossShape")
+        trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flag_FullModel=training_args.flag_disturb_fullModel,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path, name="lossShape")
 
         # **4. 计算 Hessian 矩阵**
-        logger.debug(f'***5***--5-3 compute_loss_hessian  ')
-        trainer.compute_hessian_version1(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA, flatminal_dataset=flatminal_dataset,output_dir=analyse_model_path, name="hessian")
-        logger.debug(f'***5***--5-4 compute mina flat finish`  ')
+        # logger.debug(f'***5***--5-3 compute_loss_hessian  ')
+        # trainer.compute_hessian_version1(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA, flatminal_dataset=flatminal_dataset,output_dir=analyse_model_path, name="hessian")
+        # logger.debug(f'***5***--5-4 compute mina flat finish`  ')
 
     return results
 
