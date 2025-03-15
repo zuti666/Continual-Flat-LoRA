@@ -49,6 +49,19 @@ from .utils import (
     set_peft_model_state_dict,
     shift_tokens_right,
 )
+import sys
+import logging
+logger = logging.getLogger(__name__)
+# Setup logging
+logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+log_level = 10
+# log_level = logging.DEBUG  # 或者 logging.DEBUG（数值 10）
+logger.setLevel(log_level)
+logger.warning(f'log_level:{log_level}' )
 
 
 PEFT_TYPE_TO_MODEL_MAPPING = {
@@ -86,22 +99,59 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
     """
 
     def __init__(self, model, peft_config: PeftConfig, adapter_name="default"):
+        logger.info(f'***init PeftModel:{peft_config}，adapter_name:{adapter_name} ')
         super().__init__()
         self.base_model = model
+
+        logger.info(f"***Before init base model:{self.base_model}")
+        for name, param in self.base_model.named_parameters():
+            logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+
+
+
+
         self.config = self.base_model.config
         self.modules_to_save = None
         self.peft_config = {}
         self.active_adapter = adapter_name
         self.peft_type = peft_config.peft_type
         self.base_model_torch_dtype = getattr(model, "dtype", None)
+        logger.info(f"***Peft Model using {peft_config}")
         if not isinstance(peft_config, PromptLearningConfig):
             self.peft_config[adapter_name] = peft_config
+            logger.info(f"***init base model")
             self.base_model = PEFT_TYPE_TO_MODEL_MAPPING[peft_config.peft_type](
                 self.base_model, self.peft_config, adapter_name
             )
+
+            logger.info(f"***After init base model:{self.base_model}")
+            for name, param in self.base_model.named_parameters():
+                logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+
+
+
+            logger.info(f"***PEFT_TYPE_TO_MODEL_MAPPING {self.peft_config}")
+            logger.info(f"***set_additional_trainable_modules, peft_config:{peft_config},adapter_name:{adapter_name}")
+            
+
+
             self.set_additional_trainable_modules(peft_config, adapter_name)
+
+            
+
+
         else:
+            logger.info(f"***add_adapter , peft_config:{peft_config},adapter_name:{adapter_name}")
+            
             self.add_adapter(adapter_name, peft_config)
+
+        logger.info(f"***debug666, peft_config:{peft_config},adapter_name:{adapter_name}")
+        logger.info(f"***debug666,self.peft_type:{self.peft_type},self.active_adapter:{self.active_adapter},self.peft_config:{self.peft_config}")
+        for name, param in self.base_model.named_parameters():
+                logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+
+        trainable_params = [n for n, p in self.base_model.named_parameters() if p.requires_grad]
+        logger.info(f"PeftModel __init__ trainable_params:{trainable_params}")
 
     def save_pretrained(self, save_directory, **kwargs):
         r"""
@@ -139,6 +189,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             inference_mode = peft_config.inference_mode
             peft_config.inference_mode = True
             peft_config.save_pretrained(output_dir)
+            logger.info(f" *** Saving peft config to {output_dir}")
             peft_config.inference_mode = inference_mode
 
     @classmethod
@@ -178,6 +229,8 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             model = cls(model, config, adapter_name)
         else:
             model = MODEL_TYPE_TO_PEFT_MODEL_MAPPING[config.task_type](model, config, adapter_name)
+            
+        logger.info(f"***load_adapter , model_id:{model_id},adapter_name:{adapter_name}")
         model.load_adapter(model_id, adapter_name, **kwargs)
         return model
 
@@ -334,10 +387,16 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         self.set_additional_trainable_modules(peft_config, adapter_name)
 
     def set_additional_trainable_modules(self, peft_config, adapter_name):
+        logger.info(f'*** ---set_additional_trainable_modules() peft_config:{peft_config},adapter_name:{adapter_name}')
+        
         if getattr(peft_config, "modules_to_save", None) is not None:
             if self.modules_to_save is None:
+                logger.info(f'*** set(peft_config.modules_to_save:{peft_config.modules_to_save}')
+                
                 self.modules_to_save = set(peft_config.modules_to_save)
             else:
+                logger.info(f'*** .update(peft_config.modules_to_save:{peft_config.modules_to_save}')
+                
                 self.modules_to_save.update(peft_config.modules_to_save)
             _set_trainable(self, adapter_name)
 
@@ -474,6 +533,8 @@ class PeftModelForSequenceClassification(PeftModel):
     """
 
     def __init__(self, model, peft_config: PeftConfig, adapter_name="default"):
+        logger.info(f'***init PeftModelForSeq2SeqLM:{peft_config}，adapter_name:{adapter_name} ')
+        
         super().__init__(model, peft_config, adapter_name)
         if self.modules_to_save is None:
             self.modules_to_save = {"classifier", "score"}

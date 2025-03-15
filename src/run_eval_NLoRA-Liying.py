@@ -797,14 +797,11 @@ def main():
                     elif name.find("shared") != -1:
                         param.requires_grad = False
         
-                
-
-
-
-
-
+        logger.debug(f'***5***-After set param   ')
         
-
+        # Debug 查看模型的参数到底是啥样子的，然后后面设置对哪些参数进行扰动
+        for name, param in model.named_parameters():
+            logger.debug(f'name:{name}, requires_grad:{param.requires_grad}')
 
         logger.debug(f'***5***--5-1 begin analyse_flat_minima  ')
 
@@ -815,7 +812,7 @@ def main():
         # **1. 直接使用 trainer.model（已包含 LoRA 适配器）**
         # **3. 计算损失景观**
         logger.debug(f'***5***--5-2 compute_loss_landscape flag_lora={training_args.flag_originLoRA}, flag_Nlora={training_args.flag_originLoRA},output_dir={analyse_model_path}  ')
-        trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flag_FullModel=training_args.flag_disturb_fullModel,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path, name="lossShape")
+        trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flag_FullModel=training_args.flag_disturb_fullModel,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path)
 
         # **4. 计算 Hessian 矩阵**
         # logger.debug(f'***5***--5-3 compute_loss_hessian  ')

@@ -417,7 +417,7 @@ class UIETrainer(Seq2SeqTrainer):
         }
 
     def compute_loss_landscape(
-        self,   flatminal_dataset: Dataset, output_dir, name="lossLandscape", x_range=(-1, 1), y_range=(-1, 1), num_points=20, max_batches=5,
+        self,   flatminal_dataset: Dataset, output_dir, save_file_name="lossLandscape", x_range=(-1, 1), y_range=(-1, 1), num_points=20, max_batches=5,
         sample_batches=False, flag_lora=True, flag_Nlora_full= False , flag_FullModel =  False,
     ):
         """
@@ -442,9 +442,7 @@ class UIETrainer(Seq2SeqTrainer):
         logger.debug(f'***5***--5-2 **1 compute_loss_landscape  ')
         logger.debug(
             f"***** Running Loss Landscape Calculation on expriment ,Nlora_full:{flag_Nlora_full}  lora:{flag_lora}*****")
-        logger.debug(
-            f"Output Dir = {output_dir}，Output File :{surf_file} Num points = {num_points}x{num_points} max_batches = {max_batches}")
-
+        
         # ✅ 兼容 AMP 和分布式训练
         # 复制模型避免污染
         model = copy.deepcopy(self.model)
@@ -470,23 +468,25 @@ class UIETrainer(Seq2SeqTrainer):
             
             if flag_FullModel: # 如果是对所有参数都进行干扰，
                 original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{name}_fullModel-predictDataset.h5")
+
+                surf_file = os.path.join(output_dir, f"{save_file_name}_fullModel-predictDataset.h5")
             elif flag_lora:  # 当不使用全部模型的参数，并且使用标准lora方法时
                 # 保存所有lora参数（lora_开头），且排除共享参数
                 if "lora_" in name and name.find("shared") == -1:
                     original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{name}_lora_only-predictDataset.h5")
+                surf_file = os.path.join(output_dir, f"{save_file_name}_lora_only-predictDataset.h5")
 
             elif flag_Nlora_full: # 当不使用全部模型的参数，不使用标准lora方法，使用Nlora方法并且干扰所有相关 lora_,loranew_模型时候
                 if ("loranew_" in name or "lora_" in name) and "shared" not in name:
                     original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{name}_Nlora_full-predictDataset.h5")
+                surf_file = os.path.join(output_dir, f"{save_file_name}_Nlora_full-predictDataset.h5")
                 
             else:
                 if "loranew_" in name and "shared" not in name:
                     original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{name}_Nlora_onlytask-predictDataset.h5")
+                surf_file = os.path.join(output_dir, f"{save_file_name}_Nlora_onlytask-predictDataset.h5")
 
+        logger.debug(f"Output Dir = {output_dir}，Output File :{surf_file} Num points = {num_points}x{num_points} max_batches = {max_batches}")
 
         # --------------------- 扰动生成优化 ---------------------
         torch.manual_seed(42)  # 固定随机种子保证可重复性
