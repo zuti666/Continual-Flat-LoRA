@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D  # 添加三维绘图库
 
+import pandas as pd
+from scipy.stats import skew, kurtosis
+import os
+
 def plot_loss_landscape(h5_file, title="Loss Landscape",savepth = None):
     """
     加载 HDF5 文件中的 Loss Landscape 数据，并绘制等高线图。
@@ -19,7 +23,50 @@ def plot_loss_landscape(h5_file, title="Loss Landscape",savepth = None):
     
     # 构造网格
     X, Y = np.meshgrid(x_coords, y_coords)
+
+
+    # 计算统计特征
+    loss_min = np.min(loss_grid)
+    loss_max = np.max(loss_grid)
+    loss_mean = np.mean(loss_grid)
+    loss_median = np.median(loss_grid)
+    loss_std = np.std(loss_grid)
+    loss_skew = skew(loss_grid.flatten())
+    loss_kurt = kurtosis(loss_grid.flatten())
+
+    # 计算局部梯度变化率 (用作 flatness 指标)
+    grad_x = np.gradient(loss_grid, axis=0)
+    grad_y = np.gradient(loss_grid, axis=1)
+    grad_norm = np.sqrt(grad_x**2 + grad_y**2)
+    mean_flatness = np.mean(grad_norm)
+    min_flatness = np.min(grad_norm)
+    max_flatness = np.max(grad_norm)
+
+    # 统计分析结果
+    analysis_results = {
+        "Min Loss": loss_min,
+        "Max Loss": loss_max,
+        "Mean Loss": loss_mean,
+        "Median Loss": loss_median,
+        "Loss Std Dev": loss_std,
+        "Skewness": loss_skew,
+        "Kurtosis": loss_kurt,
+        "Mean Flatness": mean_flatness,
+        "Min Flatness": min_flatness,
+        "Max Flatness": max_flatness
+    }
+
+    # 保存统计数据
+    df = pd.DataFrame(analysis_results, index=[0])
+    csv_path = f"{savepth}_stats.csv"
+    df.to_csv(csv_path, index=False)
+
+    # 打印统计结果
+    print("=== Loss Landscape Analysis ===")
+    # print(df)
+    print(f"Results saved to {csv_path}")
     
+    # 2D 等高线图
     plt.figure(figsize=(8, 6))
     cp = plt.contourf(X, Y, loss_grid.T, levels=20, cmap='viridis')
     plt.colorbar(cp)
@@ -41,6 +88,8 @@ def plot_loss_landscape(h5_file, title="Loss Landscape",savepth = None):
     ax.set_zlabel("Loss")
     plt.savefig(f'{savepth}_3d.png')
     plt.show()
+
+
 
 def plot_hessian_stats(h5_file, title="Hessian Statistics"):
     """
@@ -68,6 +117,36 @@ def plot_hessian_stats(h5_file, title="Hessian Statistics"):
     plt.axvline(median_eig, color='r', linestyle='--', label=f"Median: {median_eig:.4f}")
     plt.legend()
     plt.show()
+
+def read_sum_table(output_file="merged_results.csv"):
+    # 创建用于存储结果的 DataFrame
+    results_df = pd.DataFrame()
+
+    csv_files = {
+        '1'  : 'initial_model/t5-small/lossLandscape_1_stats.csv',
+        '2-1': 'initial_model/t5-small/lossLandscape_2-1_stats.csv',
+        '2-2': 'initial_model/t5-small/lossLandscape_2-2_stats.csv',
+        '2-3': 'initial_model/t5-small/lossLandscape_2-3_stats.csv',
+        '3-1': 'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1_stats.csv',
+        '3-2': 'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2_stats.csv',
+        '3-3': 'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3_stats.csv'
+    }
+
+    # 读取并合并所有 CSV 文件
+    for key, file in csv_files.items():
+        if os.path.exists(file):  # 确保文件存在
+            df = pd.read_csv(file)
+            df.insert(0, "Experiment", key)  # 在第一列插入实验编号
+            results_df = pd.concat([results_df, df], ignore_index=True)
+
+    # 只保留小数点后三位
+    results_df = results_df.round(3)
+
+    # 保存合并后的数据到 CSV 文件
+    # results_df.to_csv(output_file, index=False)
+    # print(f"合并结果已保存到 {output_file}")
+    results_df.to_excel(output_file, index=False, engine='openpyxl')
+    print(f"合并结果已保存到 {output_file}")
 
 if __name__ == "__main__":
 
@@ -177,46 +256,47 @@ if __name__ == "__main__":
     
 
     """------------------Eval T5 initial model------------------------"""
-    # order1 - 1-dbpedia  --1 --origin model full perturb
+    # read_sum_table(output_file="logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/merged_results.xlsx")
+    # # order1 - 1-dbpedia  --1 --origin model full perturb
     loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_1.h5"
-    save_pth_lora =            'initial_model/t5-small/lossLandscape_1'
+    save_pth_lora =            'initial_model/t5-small/lossLandscape_1_t2'
     plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
     # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only W
-    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-1.h5"
-    save_pth_lora =            'initial_model/t5-small/lossLandscape_2-1'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-1.h5"
+    # save_pth_lora =            'initial_model/t5-small/lossLandscape_2-1_t2'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
-    # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only AB
-    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-2.h5"
-    save_pth_lora =            'initial_model/t5-small/lossLandscape_2-2'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
-
-
-    # order1 - 1-dbpedia --2 --origin model with LoRA no train --  W -AB
-    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-3.h5"
-    save_pth_lora =            'initial_model/t5-small/lossLandscape_2-3'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only AB
+    # loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-2.h5"
+    # save_pth_lora =            'initial_model/t5-small/lossLandscape_2-2'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
 
+    # # order1 - 1-dbpedia --2 --origin model with LoRA no train --  W -AB
+    # loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-3.h5"
+    # save_pth_lora =            'initial_model/t5-small/lossLandscape_2-3'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
 
-    # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only W
-    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1.h5"
-    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
-    # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only AB
+
+    # # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only W
+    # loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1.h5"
+    # save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+    # # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only AB
                                 
-    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2.h5"
-    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2.h5"
+    # save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
 
-    # order1 - 1-dbpedia --3 --origin model with LoRA after train --  W -AB
-    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3.h5"
-    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # # order1 - 1-dbpedia --3 --origin model with LoRA after train --  W -AB
+    # loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3.h5"
+    # save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
     
     
     

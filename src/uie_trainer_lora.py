@@ -463,7 +463,7 @@ class UIETrainer(Seq2SeqTrainer):
         # 确定需要扰动的参数名称
         # 根据不同的微调方法（Nlora或lora）确定需要保存原始值的参数
 
-        new_Flag  = '3.3'
+        new_Flag  = '2.1'
         original_params_to_perturb = {}
         for name, param in model.named_parameters():
 
@@ -471,13 +471,20 @@ class UIETrainer(Seq2SeqTrainer):
 
             if new_Flag == '1': # 只更改 W
                 if  "shared" not in name:
+                    param.requires_grad = True
                     original_params_to_perturb[name] = param.data.clone()
+                    
                 surf_file = os.path.join(output_dir, f"{save_file_name}_1.h5")
 
             # 注意，2.1 加载的是初始模型，然后加载过后添加了LoRA部分，进行了初始化
             elif new_Flag == '2.1': # 只更改 W
-                if "lora_" not in name and "shared" not in name:
-                    original_params_to_perturb[name] = param.data.clone()
+                      
+                if "lora_"  in name and "shared" not in name:
+                    param.requires_grad = False
+                elif "lora_" not in name and "shared" not in name:
+                    param.requires_grad = True
+                    original_params_to_perturb[name] = param.data.clone() 
+
                 surf_file = os.path.join(output_dir, f"{save_file_name}_2-1.h5")
             elif new_Flag == '2.2': # 只更改 AB
                 if "lora_"  in name and "shared" not in name:
@@ -531,6 +538,7 @@ class UIETrainer(Seq2SeqTrainer):
         logger.debug(f"*** Perturbed Parameters ***")
         for name in original_params_to_perturb.keys():
             logger.debug(f"name: {name}, requires_grad: {model.state_dict()[name].requires_grad}")
+
 
 
         logger.debug(f"Output Dir = {output_dir}，Output File :{surf_file} Num points = {num_points}x{num_points} max_batches = {max_batches}")
@@ -623,16 +631,14 @@ class UIETrainer(Seq2SeqTrainer):
             for j, yv in enumerate(y_coords):
                 # 恢复参数时仅操作需要修改的部分（优化点1）
                 for name in original_params_to_perturb:
-                    model.state_dict()[name].copy_(
-                        original_params_to_perturb[name])
+                    model.state_dict()[name].copy_(original_params_to_perturb[name])
 
                 # 应用扰动
                 with torch.no_grad():
                     for name in original_params_to_perturb:
                         param = model.state_dict()[name]
                         delta = xv * \
-                            perturb_x[name].to(
-                                param.dtype) + yv * perturb_y[name].to(param.dtype)
+                            perturb_x[name].to(param.dtype) + yv * perturb_y[name].to(param.dtype)
                         param.add_(delta)  # 原位操作减少内存分配
 
                 # 计算损失
