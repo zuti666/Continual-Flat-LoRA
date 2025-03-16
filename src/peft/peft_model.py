@@ -148,7 +148,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         logger.info(f"***debug666, peft_config:{peft_config},adapter_name:{adapter_name}")
         logger.info(f"***debug666,self.peft_type:{self.peft_type},self.active_adapter:{self.active_adapter},self.peft_config:{self.peft_config}")
         for name, param in self.base_model.named_parameters():
-                logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+                logger.debug(f'model.named_parameters() After traing set name:{name} , param.requires_grad:{param.requires_grad}')
 
         trainable_params = [n for n, p in self.base_model.named_parameters() if p.requires_grad]
         logger.info(f"PeftModel __init__ trainable_params:{trainable_params}")

@@ -258,13 +258,13 @@ if __name__ == "__main__":
     """------------------Eval T5 initial model------------------------"""
     # read_sum_table(output_file="logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/merged_results.xlsx")
     # # order1 - 1-dbpedia  --1 --origin model full perturb
-    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_1.h5"
-    save_pth_lora =            'initial_model/t5-small/lossLandscape_1_t2'
-    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    # loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_1.h5"
+    # save_pth_lora =            'initial_model/t5-small/lossLandscape_1_t2'
+    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
     # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only W
     # loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-1.h5"
-    # save_pth_lora =            'initial_model/t5-small/lossLandscape_2-1_t2'
+    # save_pth_lora =            'initial_model/t5-small/lossLandscape_2-1_t3'
     # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
     # # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only AB
@@ -282,9 +282,9 @@ if __name__ == "__main__":
 
 
     # # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only W
-    # loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1.h5"
-    # save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1'
-    # plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1_t1.h5"
+    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1_t1'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
 
     # # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only AB
                                 

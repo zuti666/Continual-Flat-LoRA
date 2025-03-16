@@ -463,7 +463,7 @@ class UIETrainer(Seq2SeqTrainer):
         # 确定需要扰动的参数名称
         # 根据不同的微调方法（Nlora或lora）确定需要保存原始值的参数
 
-        new_Flag  = '2.1'
+        new_Flag  = '3.1'
         original_params_to_perturb = {}
         for name, param in model.named_parameters():
 
@@ -497,9 +497,14 @@ class UIETrainer(Seq2SeqTrainer):
 
             # 注意，3.1 加载的是训练保存得到的adapter模型，里面具有训练后的LoRA部分
             elif new_Flag == '3.1': # 只更改 W
-                if "lora_" not in name and "shared" not in name:
-                    original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{save_file_name}_3-1.h5")
+
+                if "lora_"  in name and "shared" not in name:
+                    param.requires_grad = False
+                elif "lora_" not in name and "shared" not in name:
+                    param.requires_grad = True
+                    original_params_to_perturb[name] = param.data.clone() 
+
+                surf_file = os.path.join(output_dir, f"{save_file_name}_3-1_t1.h5")
             elif new_Flag == '3.2': # 只更改 AB
                 if "lora_"  in name and "shared" not in name:
                     original_params_to_perturb[name] = param.data.clone()
