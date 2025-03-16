@@ -755,53 +755,7 @@ def main():
 
 
 
-        #设置需要进行评估的参数
-        if training_args.flag_disturb_fullModel:
-            # 如果是要对模型的所有参数都进行评估
-            for name, param in model.named_parameters():
-                param.requires_grad = True
-
-        # 不改变整个模型的参数，只改变添加的lora部分的参数
-        elif training_args.flag_originLoRA:
-        
-        # 如果需要评估模型 并且模型是LoRA方法训练得到的
-        # 则需要将 模型的LoRA设置为可以更新的，以供计算Hessian矩阵使用
-            for name, param in model.named_parameters():
-                if name.find("lora_") != -1:
-                    param.requires_grad = True
-                # this module should always be frozen because we change the vocabulary
-                elif name.find("shared") != -1:
-                    param.requires_grad = False
-        elif training_args.flag_modifiedNLoRA:
-        # 如果需要评估模型 并且模型是N_LoRA方法训练得到的
-            if training_args.flag_modifiedNLoRA_fullLoRA:
-                # 如果评估N_LoRA方法的所有LoRA （lora_和 loranew_）对模型的影响
-                # 则将这两部分全部设置为可以更新的，以供计算Hessian矩阵使用 
-                for name, param in model.named_parameters():
-                    if name.find("loranew_") != -1:
-                        param.requires_grad = True
-                    elif name.find("lora_") != -1:
-                        param.requires_grad = True
-                    # this module should always be frozen because we change the vocabulary
-                    elif name.find("shared") != -1:
-                        param.requires_grad = False
-            elif training_args.flag_modifiedNLoRA_taskLoRA:
-                # 如果只评估N_LoRA方法的  taskLoRA部分 （loranew_）对模型的影响
-                # 则将这部分设置为可以更新的，以供计算Hessian矩阵使用 
-                for name, param in model.named_parameters():
-                    if name.find("loranew_") != -1:
-                        param.requires_grad = True
-                    elif name.find("lora_") != -1:
-                        param.requires_grad = False
-                    # this module should always be frozen because we change the vocabulary
-                    elif name.find("shared") != -1:
-                        param.requires_grad = False
-        
-        logger.debug(f'***5***-After set param   ')
-        
-        # Debug 查看模型的参数到底是啥样子的，然后后面设置对哪些参数进行扰动
-        for name, param in model.named_parameters():
-            logger.debug(f'name:{name}, requires_grad:{param.requires_grad}')
+       
 
         logger.debug(f'***5***--5-1 begin analyse_flat_minima  ')
 

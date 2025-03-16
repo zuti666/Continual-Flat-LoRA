@@ -177,10 +177,46 @@ if __name__ == "__main__":
     
 
     """------------------Eval T5 initial model------------------------"""
-    # order1 - 1-dbpedia 
-    loss_landscape_lora_file = "initial_model/t5-small/lossShape_lora_only-predictDataset.h5"
-    # save_pth_lora =            'initial_model/t5-small/lossShape_originModel_fullWeight'
-    save_pth_lora =            'initial_model/t5-small/lossShape_originModel_lora_beforeTrain'
+    # order1 - 1-dbpedia  --1 --origin model full perturb
+    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_1.h5"
+    save_pth_lora =            'initial_model/t5-small/lossLandscape_1'
     plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+    # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only W
+    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-1.h5"
+    save_pth_lora =            'initial_model/t5-small/lossLandscape_2-1'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+    # order1 - 1-dbpedia --2 --origin model with LoRA no train -- only AB
+    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-2.h5"
+    save_pth_lora =            'initial_model/t5-small/lossLandscape_2-2'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+
+    # order1 - 1-dbpedia --2 --origin model with LoRA no train --  W -AB
+    loss_landscape_lora_file = "initial_model/t5-small/lossLandscape_2-3.h5"
+    save_pth_lora =            'initial_model/t5-small/lossLandscape_2-3'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+
+
+
+    # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only W
+    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1.h5"
+    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-1'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+    # order1 - 1-dbpedia --3 --origin model with LoRA after train -- only AB
+                                
+    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2.h5"
+    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-2'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+
+
+    # order1 - 1-dbpedia --3 --origin model with LoRA after train --  W -AB
+    loss_landscape_lora_file = "logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3.h5"
+    save_pth_lora =            'logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora/lossLandscape_3-3'
+    plot_loss_landscape(loss_landscape_lora_file, title="Dispeturb Loss Landscape",savepth = save_pth_lora)
+    
     
     

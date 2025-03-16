@@ -174,7 +174,8 @@ class LoraModel(torch.nn.Module):
 
         self.add_adapter(adapter_name, self.peft_config[adapter_name])
 
-        
+        # logger.debug(f'*********class loraModel() __init__() test Try not add adapter' )
+
         trainable_params = [n for n, p in self.model.named_parameters() if p.requires_grad]
         logger.debug(f'*********class loraModel() __init__() Using Lora with config After add_adapter trainable_params:{trainable_params}' )
 

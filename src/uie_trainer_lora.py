@@ -440,8 +440,7 @@ class UIETrainer(Seq2SeqTrainer):
 
         # ✅ 记录日志信息
         logger.debug(f'***5***--5-2 **1 compute_loss_landscape  ')
-        logger.debug(
-            f"***** Running Loss Landscape Calculation on expriment ,Nlora_full:{flag_Nlora_full}  lora:{flag_lora}*****")
+        # logger.debug(f"***** Running Loss Landscape Calculation on expriment ,Nlora_full:{flag_Nlora_full}  lora:{flag_lora}*****")
         
         # ✅ 兼容 AMP 和分布式训练
         # 复制模型避免污染
@@ -463,28 +462,76 @@ class UIETrainer(Seq2SeqTrainer):
         # --------------------- 生成参数扰动阶段阶段 ---------------------
         # 确定需要扰动的参数名称
         # 根据不同的微调方法（Nlora或lora）确定需要保存原始值的参数
+
+        new_Flag  = '3.3'
         original_params_to_perturb = {}
         for name, param in model.named_parameters():
-            
-            if flag_FullModel: # 如果是对所有参数都进行干扰，
-                original_params_to_perturb[name] = param.data.clone()
 
-                surf_file = os.path.join(output_dir, f"{save_file_name}_fullModel-predictDataset.h5")
-            elif flag_lora:  # 当不使用全部模型的参数，并且使用标准lora方法时
-                # 保存所有lora参数（lora_开头），且排除共享参数
-                if "lora_" in name and name.find("shared") == -1:
-                    original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{save_file_name}_lora_only-predictDataset.h5")
+            # 注意 默认加载的模型已经添加了LoRA部分，如果是1 需要设置lora 中的代码 去掉 add_lora的代码
 
-            elif flag_Nlora_full: # 当不使用全部模型的参数，不使用标准lora方法，使用Nlora方法并且干扰所有相关 lora_,loranew_模型时候
-                if ("loranew_" in name or "lora_" in name) and "shared" not in name:
+            if new_Flag == '1': # 只更改 W
+                if  "shared" not in name:
                     original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{save_file_name}_Nlora_full-predictDataset.h5")
+                surf_file = os.path.join(output_dir, f"{save_file_name}_1.h5")
+
+            # 注意，2.1 加载的是初始模型，然后加载过后添加了LoRA部分，进行了初始化
+            elif new_Flag == '2.1': # 只更改 W
+                if "lora_" not in name and "shared" not in name:
+                    original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{save_file_name}_2-1.h5")
+            elif new_Flag == '2.2': # 只更改 AB
+                if "lora_"  in name and "shared" not in name:
+                    original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{save_file_name}_2-2.h5")
+            elif new_Flag == '2.3': # 只更改 W AB
+                if  "shared" not in name:
+                    original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{save_file_name}_2-3.h5")
+
+            # 注意，3.1 加载的是训练保存得到的adapter模型，里面具有训练后的LoRA部分
+            elif new_Flag == '3.1': # 只更改 W
+                if "lora_" not in name and "shared" not in name:
+                    original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{save_file_name}_3-1.h5")
+            elif new_Flag == '3.2': # 只更改 AB
+                if "lora_"  in name and "shared" not in name:
+                    original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{save_file_name}_3-2.h5")
+            elif new_Flag == '3.3': # 只更改 W AB
+                if  "shared" not in name:
+                    original_params_to_perturb[name] = param.data.clone()
+                surf_file = os.path.join(output_dir, f"{save_file_name}_3-3.h5")
+
+
+
+            # if flag_FullModel: # 如果是对所有参数都进行干扰，
                 
-            else:
-                if "loranew_" in name and "shared" not in name:
-                    original_params_to_perturb[name] = param.data.clone()
-                surf_file = os.path.join(output_dir, f"{save_file_name}_Nlora_onlytask-predictDataset.h5")
+            #     if "shared" not in name:
+            #         original_params_to_perturb[name] = param.data.clone()
+
+            #     surf_file = os.path.join(output_dir, f"{save_file_name}_fullModel-predictDataset.h5")
+            # elif flag_lora:  # 当不使用全部模型的参数，并且使用标准lora方法时
+            #     # 保存所有lora参数（lora_开头），且排除共享参数
+            #     if "lora_" in name and "shared" not in name:
+            #         original_params_to_perturb[name] = param.data.clone()
+            #     surf_file = os.path.join(output_dir, f"{save_file_name}_lora_only-predictDataset.h5")
+
+            # elif flag_Nlora_full: # 当不使用全部模型的参数，不使用标准lora方法，使用Nlora方法并且干扰所有相关 lora_,loranew_模型时候
+            #     if ("loranew_" in name or "lora_" in name) and "shared" not in name:
+            #         original_params_to_perturb[name] = param.data.clone()
+            #     surf_file = os.path.join(output_dir, f"{save_file_name}_Nlora_full-predictDataset.h5")
+                
+            # else:
+            #     if "loranew_" in name and "shared" not in name:
+            #         original_params_to_perturb[name] = param.data.clone()
+            #     surf_file = os.path.join(output_dir, f"{save_file_name}_Nlora_onlytask-predictDataset.h5")
+
+
+        # 添加日志，打印所有被加入扰动的参数
+        logger.debug(f"*** Perturbed Parameters ***")
+        for name in original_params_to_perturb.keys():
+            logger.debug(f"name: {name}, requires_grad: {model.state_dict()[name].requires_grad}")
+
 
         logger.debug(f"Output Dir = {output_dir}，Output File :{surf_file} Num points = {num_points}x{num_points} max_batches = {max_batches}")
 
@@ -677,6 +724,56 @@ class UIETrainer(Seq2SeqTrainer):
         # 混合精度处理
         # if full fp16 or bf16 eval is wanted and this ``evaluation`` or ``predict`` isn't called
         # while ``train`` is running, cast it to the right dtype first and then put on device
+
+        # 设置要评估的参数
+         #设置需要进行评估的参数
+        # if training_args.flag_disturb_fullModel:
+        #     # 如果是要对模型的所有参数都进行评估
+        #     for name, param in model.named_parameters():
+        #         param.requires_grad = True
+
+        # # 不改变整个模型的参数，只改变添加的lora部分的参数
+        # elif training_args.flag_originLoRA:
+        
+        # # 如果需要评估模型 并且模型是LoRA方法训练得到的
+        # # 则需要将 模型的LoRA设置为可以更新的，以供计算Hessian矩阵使用
+        #     for name, param in model.named_parameters():
+        #         if name.find("lora_") != -1:
+        #             param.requires_grad = True
+        #         # this module should always be frozen because we change the vocabulary
+        #         elif name.find("shared") != -1:
+        #             param.requires_grad = False
+        # elif training_args.flag_modifiedNLoRA:
+        # # 如果需要评估模型 并且模型是N_LoRA方法训练得到的
+        #     if training_args.flag_modifiedNLoRA_fullLoRA:
+        #         # 如果评估N_LoRA方法的所有LoRA （lora_和 loranew_）对模型的影响
+        #         # 则将这两部分全部设置为可以更新的，以供计算Hessian矩阵使用 
+        #         for name, param in model.named_parameters():
+        #             if name.find("loranew_") != -1:
+        #                 param.requires_grad = True
+        #             elif name.find("lora_") != -1:
+        #                 param.requires_grad = True
+        #             # this module should always be frozen because we change the vocabulary
+        #             elif name.find("shared") != -1:
+        #                 param.requires_grad = False
+        #     elif training_args.flag_modifiedNLoRA_taskLoRA:
+        #         # 如果只评估N_LoRA方法的  taskLoRA部分 （loranew_）对模型的影响
+        #         # 则将这部分设置为可以更新的，以供计算Hessian矩阵使用 
+        #         for name, param in model.named_parameters():
+        #             if name.find("loranew_") != -1:
+        #                 param.requires_grad = True
+        #             elif name.find("lora_") != -1:
+        #                 param.requires_grad = False
+        #             # this module should always be frozen because we change the vocabulary
+        #             elif name.find("shared") != -1:
+        #                 param.requires_grad = False
+        
+        # logger.debug(f'***5***-After set param   ')
+        
+        # # Debug 查看设置完后的对哪些参数进行扰动
+        # for name, param in model.named_parameters():
+        #     logger.debug(f'name:{name}, requires_grad:{param.requires_grad}')
+
 
         # 输出 batch 和参数的类型
         logger.debug(

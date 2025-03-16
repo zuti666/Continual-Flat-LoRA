@@ -17,9 +17,9 @@ CUDA_VISIBLE_DEVICES=0 deepspeed --master_port $port src/run_eval_NLoRA-Liying.p
    --flag_modifiedNLoRA False \
    --flag_modifiedNLoRA_fullLoRA False \
    --flag_modifiedNLoRA_taskLoRA False \
-   --flag_disturb_fullModel True \
+   --flag_disturb_fullModel False \
    --predict_with_generate \
-   --model_name_or_path initial_model/t5-small \
+   --model_name_or_path logs-outputs_T5/order_1/outputs/1-dbpedia/adapter_lora \
    --data_dir CL_Benchmark \
    --task_config_dir configs/order1_configs/dbpedia \
    --instruction_file configs/instruction_config.json \
