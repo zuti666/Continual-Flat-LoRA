@@ -105,7 +105,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
 
         logger.info(f"***Before init base model:{self.base_model}")
         for name, param in self.base_model.named_parameters():
-            logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+            logger.debug(f'model.named_parameters() before init PeftModel:{name} , param.requires_grad:{param.requires_grad}')
 
 
 
@@ -117,6 +117,8 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         self.peft_type = peft_config.peft_type
         self.base_model_torch_dtype = getattr(model, "dtype", None)
         logger.info(f"***Peft Model using {peft_config}")
+
+
         if not isinstance(peft_config, PromptLearningConfig):
             self.peft_config[adapter_name] = peft_config
             logger.info(f"***init base model")
@@ -126,7 +128,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
 
             logger.info(f"***After init base model:{self.base_model}")
             for name, param in self.base_model.named_parameters():
-                logger.debug(f'model.named_parameters() before traing set name:{name} , param.requires_grad:{param.requires_grad}')
+                logger.debug(f'***model.named_parameters() After init Model:{name} , param.requires_grad:{param.requires_grad}')
 
 
 
@@ -148,7 +150,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         logger.info(f"***debug666, peft_config:{peft_config},adapter_name:{adapter_name}")
         logger.info(f"***debug666,self.peft_type:{self.peft_type},self.active_adapter:{self.active_adapter},self.peft_config:{self.peft_config}")
         for name, param in self.base_model.named_parameters():
-                logger.debug(f'model.named_parameters() After traing set name:{name} , param.requires_grad:{param.requires_grad}')
+                logger.debug(f'"***debug666,model.named_parameters() After traing set name:{name} , param.requires_grad:{param.requires_grad}')
 
         trainable_params = [n for n, p in self.base_model.named_parameters() if p.requires_grad]
         logger.info(f"PeftModel __init__ trainable_params:{trainable_params}")

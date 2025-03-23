@@ -2,7 +2,8 @@ import logging
 
 import torch
 from transformers.data.data_collator import *
-
+from transformers import PreTrainedTokenizerBase
+from torchvision import transforms
 
 logger = logging.getLogger(__name__)
 
@@ -225,3 +226,67 @@ class DataCollatorForUIE:
                 for text, label in zip(sources, labels['input_ids']):
                     f.write(text + '\n')
                     f.write(self.tokenizer.decode(label, clean_up_tokenization_spaces=False) + '\n')
+
+
+
+
+
+
+
+
+@dataclass
+class DataCollatorForImages:
+    """
+    DataCollator for Image Classification to be used with Hugging Face Trainer.
+    Handles padding, tensor conversion, and batch collation.
+    """
+    padding: bool = True
+    return_tensors: str = "pt"
+    image_size: Tuple[int, int] = (224, 224)  # Default image size for ResNet
+
+    def __call__(self, batch: List[Any]) -> Dict[str, torch.Tensor]:
+        """
+        Processes a batch of images and labels into tensors.
+        """
+        # ✅ 确保 transform 不会对 tensor 进行 `ToTensor()` 操作
+        transform = transforms.Compose([
+            transforms.Resize(self.image_size),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        # ✅ 分离 `pixel_values` 和 `labels`
+        images, labels = zip(*batch)
+
+        # ✅ 确保 `images` 是 `torch.Tensor`，直接归一化处理
+        pixel_values = torch.stack([transform(img) if isinstance(img, torch.Tensor) else transform(transforms.ToTensor()(img)) for img in images])
+
+        labels = torch.tensor(labels, dtype=torch.long)
+
+        return {"pixel_values": pixel_values, "labels": labels}
+        # """
+        # Processes a batch of images and labels into tensors.
+        # Supports both tuple `(image, label)` and dict `{ "pixel_values": ..., "labels": ... }`
+        # """
+        # # 定义图像变换
+        # transform = transforms.Compose([
+        #     transforms.Resize(self.image_size),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        # ])
+
+        # # ✅ 兼容 `tuple` 和 `dict` 格式
+        # if isinstance(batch[0], tuple):  
+        #     images, labels = zip(*batch)  # ✅ 解包 `tuple`
+        # elif isinstance(batch[0], dict):  
+        #     images = [item["pixel_values"] for item in batch]
+        #     labels = [item["labels"] for item in batch]
+        # else:
+        #     raise TypeError(f"❌ `batch` 格式错误，必须是 `tuple (image, label)` 或 `dict`，但收到 `{type(batch[0])}`")
+
+        # # ✅ 转换 `pixel_values`
+        # pixel_values = torch.stack([transform(img) for img in images])
+
+        # # ✅ 转换 `labels`
+        # labels = torch.tensor(labels, dtype=torch.long)
+
+        # return {"pixel_values": pixel_values, "labels": labels}

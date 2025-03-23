@@ -119,8 +119,9 @@ class ModelArguments:
         },
     )
     # added for AutoCL
+    # 修改这个参数
     lora_dim: Optional[int] = field(
-        default=8,
+        default=4, #8
         metadata={
             "help": "Intrinsic dimension of the latent space."
         },
@@ -294,6 +295,8 @@ def main():
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
 
+
+    """-----------------  Args -------------------- """
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, UIETrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -304,7 +307,10 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # Setup logging
+
+
+
+    """-----------------Setup logger-------------------- """
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
@@ -326,6 +332,81 @@ def main():
     )
     logger.debug(f"Training/evaluation parameters {training_args}")
 
+    
+
+
+
+    """ ----------------- Get the UIE dataset-----------------"""
+    
+    data_cache_dir = gen_cache_path(training_args.output_dir, data_args)
+
+    
+    raw_datasets = load_dataset(
+        os.path.join(CURRENT_DIR, "uie_dataset_lora.py"),
+        data_dir=data_args.data_dir,
+        task_config_dir=data_args.task_config_dir,
+        instruction_file=data_args.instruction_file,
+        instruction_strategy=data_args.instruction_strategy,
+        cache_dir=data_cache_dir,  # for debug, change dataset size, otherwise open it
+        max_num_instances_per_task=data_args.max_num_instances_per_task,
+        max_num_instances_per_eval_task=data_args.max_num_instances_per_eval_task,
+        num_examples=data_args.num_examples
+    )
+    raw_datasets.cleanup_cache_files()
+
+    if training_args.do_train:
+        if "train" not in raw_datasets:
+            raise ValueError("--do_train requires a train dataset")
+        train_dataset = raw_datasets["train"]
+        if data_args.max_train_samples is not None:
+            train_dataset = train_dataset.select(
+                range(data_args.max_train_samples))
+
+    if training_args.do_eval:
+        if "validation" not in raw_datasets:
+            raise ValueError("--do_eval requires a validation dataset")
+        eval_dataset = raw_datasets["validation"]
+        if data_args.max_eval_samples is not None:
+            eval_dataset = eval_dataset.select(
+                range(data_args.max_eval_samples))
+
+    if training_args.do_predict:
+        if "test" not in raw_datasets:
+            raise ValueError("--do_predict requires a test dataset")
+        predict_dataset = raw_datasets["test"]
+        if data_args.max_predict_samples is not None:
+            predict_dataset = predict_dataset.select(
+                range(data_args.max_predict_samples))
+
+    # 修改代码 ，如果需要评估模型的flat minal 设置使用对应的数据集
+    if training_args.do_flatminal:
+        if "test" not in raw_datasets:
+            raise ValueError("--do_flatminal requires a test dataset")
+        flatminal_dataset = raw_datasets["test"]
+        if data_args.max_flatminal_samples is not None:
+            flatminal_dataset = flatminal_dataset.select(
+                range(data_args.max_flatminal_samples))
+
+    # Data collator
+    label_pad_token_id = - \
+        100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
+    data_collator = DataCollatorForUIE(
+        tokenizer,
+        model=model,
+        padding="longest",
+        max_source_length=data_args.max_source_length,
+        max_target_length=data_args.max_target_length,
+        label_pad_token_id=label_pad_token_id,
+        pad_to_multiple_of=8 if training_args.fp16 else None,
+        add_task_name=data_args.add_task_name,
+        add_dataset_name=data_args.add_dataset_name,
+        num_examples=data_args.num_examples,
+        input_record_file=data_args.input_record_file
+    )
+
+    """-----------------Load pretrained model and tokenizer-----------------"""
+    set_seed(training_args.seed)
+
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -341,31 +422,12 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Set seed before initializing model.
-    set_seed(training_args.seed)
-    data_cache_dir = gen_cache_path(training_args.output_dir, data_args)
 
-    # Get the UIE dataset
-    raw_datasets = load_dataset(
-        os.path.join(CURRENT_DIR, "uie_dataset_lora.py"),
-        data_dir=data_args.data_dir,
-        task_config_dir=data_args.task_config_dir,
-        instruction_file=data_args.instruction_file,
-        instruction_strategy=data_args.instruction_strategy,
-        cache_dir=data_cache_dir,  # for debug, change dataset size, otherwise open it
-        max_num_instances_per_task=data_args.max_num_instances_per_task,
-        max_num_instances_per_eval_task=data_args.max_num_instances_per_eval_task,
-        num_examples=data_args.num_examples
-    )
-    raw_datasets.cleanup_cache_files()
-
-    # Load pretrained model and tokenizer
-
-    
 
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
+    """-----------------*1 Load tokenizer-----------------"""
     logger.debug('***1***Load pretrained model and tokenizer**')
     if 'adapter' in model_args.model_name_or_path:  # load lora-config
         logger.info(f'***1***-adapter  if {model_args.model_name_or_path}')
@@ -419,6 +481,7 @@ def main():
             use_auth_token=True if model_args.use_auth_token else None,
         )
 
+    """-----------------*2 Load model_class()-----------------"""
     logger.info('*****2***Load model_class**')
     if 'llama' in model_args.model_name_or_path.lower():  # add llama
         logger.info(f'***2***--2-llama  {model_args.model_name_or_path.lower()}')
@@ -428,6 +491,7 @@ def main():
         logger.info(f'***2***--2-else  {model_args.model_name_or_path.lower()}')
         model_class = AutoModelForSeq2SeqLM
 
+    """-----------------*3 Load model, Load PEFT MODEL-----------------"""
     if 'adapter' in model_args.model_name_or_path:  # add lora-adapter to the original model
         logger.info(f'***3***--3-adapter  {model_args.model_name_or_path}')
         model = model_class.from_pretrained(config.base_model_name_or_path)
@@ -495,7 +559,7 @@ def main():
 
         if training_args.flag_originLoRA:
             # 如果需要训练模型 并且使用的方法是LoRA 方法
-            adapter_save_pth = '/adapter_lora'
+            adapter_save_pth = '/adapter_lora-4'
             # 根据LoRA 方法的设置，这里只有 lora_ 参数，也只更新lora_ 部分的参数
             for name, param in model.named_parameters():
                 if name.find("lora_") != -1:
@@ -538,55 +602,7 @@ def main():
                 "resize the model's position encodings by passing `--resize_position_embeddings`."
             )
 
-    if training_args.do_train:
-        if "train" not in raw_datasets:
-            raise ValueError("--do_train requires a train dataset")
-        train_dataset = raw_datasets["train"]
-        if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(
-                range(data_args.max_train_samples))
-
-    if training_args.do_eval:
-        if "validation" not in raw_datasets:
-            raise ValueError("--do_eval requires a validation dataset")
-        eval_dataset = raw_datasets["validation"]
-        if data_args.max_eval_samples is not None:
-            eval_dataset = eval_dataset.select(
-                range(data_args.max_eval_samples))
-
-    if training_args.do_predict:
-        if "test" not in raw_datasets:
-            raise ValueError("--do_predict requires a test dataset")
-        predict_dataset = raw_datasets["test"]
-        if data_args.max_predict_samples is not None:
-            predict_dataset = predict_dataset.select(
-                range(data_args.max_predict_samples))
-
-    # 修改代码 ，如果需要评估模型的flat minal 设置使用对应的数据集
-    if training_args.do_flatminal:
-        if "test" not in raw_datasets:
-            raise ValueError("--do_flatminal requires a test dataset")
-        flatminal_dataset = raw_datasets["test"]
-        if data_args.max_flatminal_samples is not None:
-            flatminal_dataset = flatminal_dataset.select(
-                range(data_args.max_flatminal_samples))
-
-    # Data collator
-    label_pad_token_id = - \
-        100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
-    data_collator = DataCollatorForUIE(
-        tokenizer,
-        model=model,
-        padding="longest",
-        max_source_length=data_args.max_source_length,
-        max_target_length=data_args.max_target_length,
-        label_pad_token_id=label_pad_token_id,
-        pad_to_multiple_of=8 if training_args.fp16 else None,
-        add_task_name=data_args.add_task_name,
-        add_dataset_name=data_args.add_dataset_name,
-        num_examples=data_args.num_examples,
-        input_record_file=data_args.input_record_file
-    )
+    
     # we don't want to remove unused columns because we will prepare each batch during training,
     # and some of the information will also be used in evaluation.
     training_args.remove_unused_columns = False
@@ -622,6 +638,10 @@ def main():
     print(f"-----Gradient checkpointing: {training_args.gradient_checkpointing} -----")
     if training_args.gradient_checkpointing:
         model.gradient_checkpointing_enable()
+
+
+
+    
 
     print(f"***--------------UIETraine: model:{model} -----")
     trainable_params = [n for n, p in model.named_parameters() if p.requires_grad]
@@ -751,7 +771,7 @@ def main():
 
         # Debug 查看模型的参数到底是啥样子的，然后后面设置对哪些参数进行扰动
         for name, param in model.named_parameters():
-            logger.debug(f'name:{name}, requires_grad:{param.requires_grad}')
+            logger.debug(f'check before eval_flatminal name:{name}, requires_grad:{param.requires_grad}')
 
 
 
@@ -768,6 +788,11 @@ def main():
         logger.debug(f'***5***--5-2 compute_loss_landscape flag_lora={training_args.flag_originLoRA}, flag_Nlora={training_args.flag_originLoRA},output_dir={analyse_model_path}  ')
         trainer.compute_loss_landscape(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flag_FullModel=training_args.flag_disturb_fullModel,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path)
 
+        # trainer.compute_loss_landscape_version2(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA,flag_FullModel=training_args.flag_disturb_fullModel,flatminal_dataset=flatminal_dataset, output_dir=analyse_model_path)
+
+
+
+            
         # **4. 计算 Hessian 矩阵**
         # logger.debug(f'***5***--5-3 compute_loss_hessian  ')
         # trainer.compute_hessian_version1(flag_lora=training_args.flag_originLoRA, flag_Nlora_full=training_args.flag_modifiedNLoRA_fullLoRA, flatminal_dataset=flatminal_dataset,output_dir=analyse_model_path, name="hessian")

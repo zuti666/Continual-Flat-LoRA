@@ -7,9 +7,9 @@ print(transformers.__version__)
 #  local_dir_use_symlinks=False, max_workers=1 )
 
 # T5-small 
-snapshot_download(repo_id="google/vit-base-patch16-224",
- local_dir="initial_model/vit-base-patch16-224/",
- local_dir_use_symlinks=False, max_workers=1 )
+# snapshot_download(repo_id="google/vit-base-patch16-224",
+#  local_dir="initial_model/vit-base-patch16-224/",
+#  local_dir_use_symlinks=False, max_workers=1 )
 
 
 
@@ -17,6 +17,6 @@ snapshot_download(repo_id="google/vit-base-patch16-224",
 
 
 # vit-base-patch16-224-in21k
-# snapshot_download(repo_id="google/vit-base-patch16-224-in21k",
-#  local_dir="initial_model/vit-base-patch16-224-in21k/",
-#  local_dir_use_symlinks=False, max_workers=1 )
+snapshot_download(repo_id="google/vit-base-patch16-224-in21k",
+ local_dir="initial_model/vit-base-patch16-224-in21k/",
+ local_dir_use_symlinks=False, max_workers=1 )

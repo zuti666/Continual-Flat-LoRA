@@ -31,9 +31,14 @@ AUX_PROB = 0.3
 
 
 def gen_cache_path(cache_dir, data_args):
-    hash_str = data_args.data_dir + data_args.task_config_dir + \
+    if data_args.instruction_file and data_args.instruction_strategy:
+        hash_str = data_args.data_dir + data_args.task_config_dir + \
                data_args.instruction_file + data_args.instruction_strategy + \
                str(data_args.max_num_instances_per_task) + str(data_args.max_num_instances_per_eval_task)
+    elif  not (data_args.instruction_file and data_args.instruction_strategy):
+        hash_str = data_args.data_dir + data_args.task_config_dir + \
+               str(data_args.max_num_instances_per_task) + str(data_args.max_num_instances_per_eval_task)
+
     hash_obj = md5(hash_str.encode("utf-8"))
     hash_id = hash_obj.hexdigest()
     cache_path = os.path.join(cache_dir, str(hash_id))
@@ -59,7 +64,7 @@ class UIEConfig(datasets.BuilderConfig):
         data_dir: task data dir, which contains the corresponding dataset dirs
         prompt_path: prompt json file, which saves task and its prompts map
         task_file: task config file, save training and testing split config, and sampling strategies.
-         Support two sampling strategies: 'random' indicates random sampling, while 'full' means to return all samples.
+        Support two sampling strategies: 'random' indicates random sampling, while 'full' means to return all samples.
         max_num_instances_per_task: max training sample size of each task
         max_num_instances_per_eval_task: max eval sample size of each task
     """
@@ -516,3 +521,7 @@ class UIEInstructions(datasets.GeneratorBasedBuilder):
                     idx += 1
                     instances.append(sample)
                     yield f"{task}##{ds_path}##{idx}", sample
+
+
+
+
